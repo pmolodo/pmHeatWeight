@@ -303,6 +303,7 @@ def heatWeight(*args, **kwargs):
     
     skin = kwargs.pop('skin', None)
     fit = kwargs.pop('fit', False)
+    undoable = kwargs.pop('undoable', False)
     
     inputArgsMessage = "Select one root joint and meshes you wish to weight"
     meshes = []
@@ -317,53 +318,79 @@ def heatWeight(*args, **kwargs):
                 return False
         elif isATypeOf(arg, 'mesh'):
             meshes.append(arg)
+        elif isATypeOf(arg, 'transform'):
+            shapes = getShapes(arg)
+            if len(shapes) == 1:
+                if isATypeOf(shapes[0], 'mesh'):
+                    meshes.append(shapes[0])
+                else:
+                    api.MGlobal.displayError(
+                        ("Error: transform has non-poly shape: %s - " % arg) +
+                        inputArgsMessage)
+                    return False
+            elif len(shapes) == 0: 
+                api.MGlobal.displayError(
+                    ("Error: transform has no shape: %s - " % arg) +
+                    inputArgsMessage)
+                return False
+            else: 
+                api.MGlobal.displayError(
+                    ("Error: transform has multiple shapes: %s - " % arg) +
+                    inputArgsMessage)
+                return False
         else:
-            api.MGlobal.displayError(("Error: not a poly mesh or joint: %s - "%
-                                     arg) + inputArgsMessage)
+            api.MGlobal.displayError(
+                ("Error: not a poly mesh or joint: %s - " % arg) +
+                inputArgsMessage)
             return False
     
     for mesh in meshes:
-        if rootJoint is None or mesh is None:
-            sel = cmds.ls(sl=1)
-            if rootJoint is None:
-                rootJoint = sel.pop(0)
-            if mesh is None:
-                mesh = sel[0]
-        
-        if skin is None:
-            skinClusters = getSkinClusters(mesh)
-            if skinClusters:
-                skin = skinClusters[0]
-            else:
-                skin = cmds.skinCluster(mesh, rootJoint, rui=False)[0]
-        
-        tempArgs={}
-        if KEEP_PINOC_INPUT_FILES:
-            objFilePath = os.path.join(_PINOCCHIO_DIR, 'mayaToPinocModel.obj')
-        else:
-            objFileHandle, objFilePath = tempfile.mkstemp('.obj', **tempArgs)
-            os.close(objFileHandle)
         try:
+            if rootJoint is None or mesh is None:
+                sel = cmds.ls(sl=1)
+                if rootJoint is None:
+                    rootJoint = sel.pop(0)
+                if mesh is None:
+                    mesh = sel[0]
+            
+            if skin is None:
+                skinClusters = getSkinClusters(mesh)
+                if skinClusters:
+                    skin = skinClusters[0]
+                else:
+                    skin = cmds.skinCluster(mesh, rootJoint, rui=False)[0]
+            
+            tempArgs={}
             if KEEP_PINOC_INPUT_FILES:
-                skelFilePath = os.path.join(_PINOCCHIO_DIR, 'mayaToPinocSkel.skel')
+                objFilePath = os.path.join(_PINOCCHIO_DIR, 'mayaToPinocModel.obj')
             else:
-                skelFileHandle, skelFilePath = tempfile.mkstemp('.skel',**tempArgs)
-                os.close(skelFileHandle)
+                objFileHandle, objFilePath = tempfile.mkstemp('.obj', **tempArgs)
+                os.close(objFileHandle)
             try:
-                skelFilePath, skelList = \
-                    pinocchioSkeletonExport(rootJoint, skelFilePath)
-                objFilePath = pinocchioObjExport(mesh, objFilePath)
-                
-                runPinocchioBin(objFilePath, skelFilePath, fit=fit)
-                pinocchioWeightsImport(mesh, skin, skelList,
-                                       weightFile=os.path.join(_PINOCCHIO_DIR,
-                                                               "attachment.out"))
+                if KEEP_PINOC_INPUT_FILES:
+                    skelFilePath = os.path.join(_PINOCCHIO_DIR, 'mayaToPinocSkel.skel')
+                else:
+                    skelFileHandle, skelFilePath = tempfile.mkstemp('.skel',**tempArgs)
+                    os.close(skelFileHandle)
+                try:
+                    skelFilePath, skelList = \
+                        pinocchioSkeletonExport(rootJoint, skelFilePath)
+                    objFilePath = pinocchioObjExport(mesh, objFilePath)
+                    
+                    runPinocchioBin(objFilePath, skelFilePath, fit=fit)
+                    pinocchioWeightsImport(mesh, skin, skelList,
+                                           weightFile=os.path.join(_PINOCCHIO_DIR,
+                                                                   "attachment.out"))
+                finally:
+                    if not KEEP_PINOC_INPUT_FILES and os.path.isfile(skelFilePath):
+                        os.remove(skelFilePath)
             finally:
-                if not KEEP_PINOC_INPUT_FILES and os.path.isfile(skelFilePath):
-                    os.remove(skelFilePath)
-        finally:
-            if not KEEP_PINOC_INPUT_FILES and os.path.isfile(objFilePath):
-                os.remove(objFilePath)
+                if not KEEP_PINOC_INPUT_FILES and os.path.isfile(objFilePath):
+                    os.remove(objFilePath)
+        except Exception, e:
+            print("warning - encountered exception while weighting mesh %s:" %
+                  mesh)
+            print e
     return True
 
 # This doesn't work - apparently demoui can't take animation data for arbitrary
@@ -420,12 +447,20 @@ def getTranslation(transform, **kwargs):
         kwargs['worldSpace'] = True
     return cmds.xform(transform, q=1, translation=1, **kwargs)
 
+def getShapes( transform, **kwargs ):
+    kwargs['shapes'] = True
+    noIntermediate = kwargs.get('noIntermediate', kwargs.get('ni', None))
+    if noIntermediate is None:
+        kwargs['noIntermediate'] = True
+    return getChildren(transform, **kwargs )         
+
 def getShape( transform, **kwargs ):
     kwargs['shapes'] = True
-    try:
-        return getChildren(transform, **kwargs )[0]            
-    except IndexError:
-        pass
+    shapes = getShapes(transform, **kwargs )
+    if len(shapes) > 0:
+        return shapes[0]
+    else:
+        return None      
 
 def getChildren(self, **kwargs):
     kwargs['children'] = True
