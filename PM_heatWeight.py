@@ -331,28 +331,15 @@ def heatWeight(*args, **kwargs):
         elif isATypeOf(arg, 'mesh'):
             meshes.append(arg)
         elif isATypeOf(arg, 'transform'):
-            shapes = getShapes(arg)
-            if len(shapes) == 1:
-                if isATypeOf(shapes[0], 'mesh'):
-                    meshes.append(shapes[0])
-                else:
-                    api.MGlobal.displayError(
-                        ("Error: transform has non-poly shape: %s - " % arg) +
-                        inputArgsMessage)
-                    return False
-            elif len(shapes) == 0: 
-                api.MGlobal.displayError(
-                    ("Error: transform has no shape: %s - " % arg) +
-                    inputArgsMessage)
-                return False
-            else: 
-                api.MGlobal.displayError(
-                    ("Error: transform has multiple shapes: %s - " % arg) +
-                    inputArgsMessage)
-                return False
+            shapes = [x for x in getShapes(arg) if isATypeOf(x, 'mesh')]
+            if len(shapes) == 0: 
+                api.MGlobal.displayWarning(
+                    "Warning: transform has no poly shape: %s - " % arg)
+            else:
+                meshes.extend(shapes) 
         else:
             api.MGlobal.displayError(
-                ("Error: not a poly mesh or joint: %s - " % arg) +
+                ("Error: not a poly mesh, transform, or joint: %s - " % arg) +
                 inputArgsMessage)
             return False
     
