@@ -1,9 +1,12 @@
 '''
 SETUP:
 ------
-Step 1: Copy the script files
-   Copy this file (PM_heatWeight.py) to the your scripts folder - it's exact
-   location varies depending on your os:
+Step 1: Copy the script files,
+      /scripts/PM_heatWeight.py
+      /scripts/AttachWeights.exe
+      /scripts/Pinocchio.dll
+   
+   to the your scripts folder: it's exact location varies depending on your os.
 
 On Windows XP:
    C:\Documents and Settings\[USER]\My Documents\maya\[VERSION]\scripts
@@ -16,35 +19,26 @@ Step 2: Copy In/Add to your userSetup.py
    and add it's contents to the end of the existing userSetup.py
    (NOTE: On windows, use notepad or wordpad, NOT microsoft word!) 
 
-Step 3: Execute command in maya
-   After doing the above, restart maya, and then execute the following in the
-   command line or script editor - when you do so, make sure you're executing in
-   PYTHON mode. To do this:
-
-   From the command line:
-       To the left of the command line should be a word that says either "MEL"
-       or "Python" - if it says "MEL", click on it to make it say "Python", THEN
-       copy and paste the command, and execute it by pressing enter.
-
-    From the script editor:
-       Above the area where you enter / execute commands should be tabs that say
-       either "MEL" or "Python".  Make sure the selected tab is "Python" before
-       copy / pasting the command, and execute it by pressing CTRL-enter.
+Step 3: Create a shelf icon
+   With maya closed, copy:
+      /prefs/icons/heatWeight.bmp
+   to:
+      /maya/[VERSION]/prefs/icons/
+   Also, copy:
+      /prefs/shelves/shelf_heatWeight.mel
+   to:
+      /maya/[VERSION]/prefs/shelves/
+   (When you start maya, you may drag the shelf button to another shelf with
+   the middle mouse button, and then delete the 'heatWeight' shelf, if so
+   desired.)
    
-# COMMAND STARTS BELOW HERE #
+USAGE:
+------
+Select the root of the skeleton you wish to weight to, then the mesh you wish
+to weight, then click the shelf button; wait a few moments for the command-
+line utility to finish, and you're done. 
 
-import abxPicker; abxPicker.abxPicker()
-
-# COMMAND ENDS ABOVE HERE #
-
-Step 4 (Optional): Create a shelf button
-    If you want a shelf button, after copy-and-pasting the above command to the
-    command line or script editor, just highlight it and middle-mouse drag it to the
-    shelf to create a shelf button as usual - however, when the choice comes up to
-
-        "Save script to shelf as type:"
-
-    make sure you selct "Python" instead of MEL!
+copyright 2009 Paul Molodowitch
 '''
 
 import subprocess
