@@ -34,14 +34,27 @@ Step 3: Create a shelf icon
    
 USAGE:
 ------
-Select the root of the skeleton you wish to weight to, then the mesh you wish
-to weight, then click the shelf button; wait a few moments for the command-
-line utility to finish, and you're done. 
+Select the root of the skeleton you wish to weight to and the meshes you wish
+to weight to the skeleton, then click the shelf button; wait a few moments for
+the script to finish, and you're done.
 
-version 0.5.1
+Note that the method this works by weighting to bones, rather than joints.
+This means that:
+    a) End joints (joints with no child joints) are never weighted
+    b) A vertex may not be weighted to the 'closest' joint, if there is a
+       'closer' BONE
+Keep this in mind when laying out your skeleton, if you intend to weight it
+using this script.
+ 
+Most of the credit for this working goes to Ilya Baran & Jovan Popović, who
+published the algorithm / developed / released the source code for the
+Pinocchio auto-rigging / weighting library which this script calls!
+
+version 0.5.2
 
 Changelog:
 
+v0.5.2 - changed input format - now can select multiple meshes
 v0.5.1 - automatically loads obj plugin, closes open poly borders
 v0.5 - initial version
 
