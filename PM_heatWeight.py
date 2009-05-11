@@ -113,8 +113,8 @@ def pinocchioObjExport(mesh, objFilePath):
             raise TypeError('cannot find a geometry shape for %s' % mesh)
             
         meshDup = addShape(mesh)
-        cmds.polyTriangulate(meshDup, ch=0)
         cmds.polyCloseBorder(meshDup, ch=0)
+        cmds.polyTriangulate(meshDup, ch=0)
         cmds.select(meshDup, r=1)
         cmds.file(objFilePath,
                 op="groups=0;ptgroups=0;materials=0;smoothing=0;normals=0",
