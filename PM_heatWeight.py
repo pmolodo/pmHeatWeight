@@ -1,3 +1,52 @@
+'''
+SETUP:
+------
+Step 1: Copy the script files
+   Copy this file (PM_heatWeight.py) to the your scripts folder - it's exact
+   location varies depending on your os:
+
+On Windows XP:
+   C:\Documents and Settings\[USER]\My Documents\maya\[VERSION]\scripts
+On Vista:
+   C:\Users\[USER]\Documents\maya\[VERSION]\scripts
+
+Step 2: Copy In/Add to your userSetup.py
+   If the above folder did not contain a file called 'userSetup.py' (NOTE- the
+   ending is .py, NOT .mel!!!) copy in the provided one - otherwise, open it
+   and add it's contents to the end of the existing userSetup.py
+   (NOTE: On windows, use notepad or wordpad, NOT microsoft word!) 
+
+Step 3: Execute command in maya
+   After doing the above, restart maya, and then execute the following in the
+   command line or script editor - when you do so, make sure you're executing in
+   PYTHON mode. To do this:
+
+   From the command line:
+       To the left of the command line should be a word that says either "MEL"
+       or "Python" - if it says "MEL", click on it to make it say "Python", THEN
+       copy and paste the command, and execute it by pressing enter.
+
+    From the script editor:
+       Above the area where you enter / execute commands should be tabs that say
+       either "MEL" or "Python".  Make sure the selected tab is "Python" before
+       copy / pasting the command, and execute it by pressing CTRL-enter.
+   
+# COMMAND STARTS BELOW HERE #
+
+import abxPicker; abxPicker.abxPicker()
+
+# COMMAND ENDS ABOVE HERE #
+
+Step 4 (Optional): Create a shelf button
+    If you want a shelf button, after copy-and-pasting the above command to the
+    command line or script editor, just highlight it and middle-mouse drag it to the
+    shelf to create a shelf button as usual - however, when the choice comes up to
+
+        "Save script to shelf as type:"
+
+    make sure you selct "Python" instead of MEL!
+'''
+
 import subprocess
 import tempfile
 import os
@@ -8,11 +57,7 @@ import maya.mel as mel
 import maya.OpenMaya as api
 import maya.OpenMayaAnim as apiAnim
 
-import PMP.pyUtils
-import PMP.maya.fileUtils
-import PMP.maya.rigging
-
-DEBUG = True
+DEBUG = False
 KEEP_PINOC_INPUT_FILES = True
 
 _PINOCCHIO_DIR = os.path.join(os.path.dirname(__file__))
@@ -29,7 +74,7 @@ def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
     by  makePinocchioSkeletonList.
     """
     if skelFile is None:
-        skelFile = PMP.maya.fileUtils.browseForFile(m=1, actionName='Export')
+        skelFile = browseForFile(m=1, actionName='Export')
     skelList = makePinocchioSkeletonList(skeletonRoot)
     fileObj = open(skelFile, mode="w")
     try:
@@ -97,7 +142,7 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None):
             cmds.skinCluster(skin, edit=1, addInfluence=joint)
 
     if weightFile is None:
-        weightFile = PMP.maya.fileUtils.browseForFile(m=0, actionName='Import')
+        weightFile = browseForFile(m=0, actionName='Import')
     vertBoneWeights = readPinocchioWeights(weightFile)
     numVertices = len(vertBoneWeights)
     numBones = len(vertBoneWeights[0])
@@ -225,7 +270,7 @@ def runPinocchioBin(meshFile, weightFile, fit=False):
         exeAndArgs.append('-fit')
     subprocess.check_call(exeAndArgs)
 
-def autoWeight(rootJoint=None, mesh=None, skin=None, fit=False):
+def heatWeight(rootJoint=None, mesh=None, skin=None, fit=False):
     if rootJoint is None or mesh is None:
         sel = cmds.ls(sl=1)
         if rootJoint is None:
@@ -464,3 +509,22 @@ def getSkinClusters(mesh):
     """
     return [x for x in listForNone(cmds.listHistory(mesh))
             if isATypeOf(x, 'skinCluster')]
+
+def browseForFile(actionName="Select", fileCommand=None, fileType=None,
+                  **kwargs):
+    """
+    Open a window to browse for a file.
+    
+    Will use fileBrowserDialog if on windows, fileDialog if not.
+    """
+    if fileCommand is None:
+        def fileCommand(*args, **kwargs): pass
+        
+    if os.name == 'nt':
+        exportFileName = cmds.fileBrowserDialog(fileCommand=fileCommand,
+                                                actionName=actionName,
+                                                fileType=fileType, **kwargs)
+    else:
+        exportFileName = cmds.fileDialog(title=actionName)
+        fileCommand(exportFileName, fileType)
+    return exportFileName   
