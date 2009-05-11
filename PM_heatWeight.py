@@ -100,6 +100,7 @@ def pinocchioObjExport(mesh, objFilePath):
             
         meshDup = addShape(mesh)
         cmds.polyTriangulate(meshDup, ch=0)
+        cmds.polyCloseBorder(meshDup, ch=0)
         cmds.select(meshDup, r=1)
         cmds.file(objFilePath,
                 op="groups=0;ptgroups=0;materials=0;smoothing=0;normals=0",
@@ -125,7 +126,8 @@ def _makePinocchioSkeletonList(skelList, newJoint, newJointParent):
 
     jointChildren = listForNone(cmds.listRelatives(newJoint, type="joint",
                                                    children=True,
-                                                   noIntermediate=True))
+                                                   noIntermediate=True,
+                                                   fullPath=True))
     for joint in jointChildren:
         _makePinocchioSkeletonList(skelList, joint, newIndex)
     return skelList
@@ -242,12 +244,26 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None):
                                     status="Setting Vert: (%i of %i)" % (progress, numVertices))
                 lastUpdateTime = cmds.timerX()
 
-            cmds.skinPercent(skin, mesh.vtx[vertIndex], normalize=False,
+            cmds.skinPercent(skin, mesh + ".vtx[%d]" % vertIndex, normalize=False,
                              transformValue=jointValues.items())
         cmds.progressWindow(endProgress=True)    
 
 def confirmNonUndoableMethod():
-    return True
+    message = \
+    '''This script works in two modes:
+    slow, but undoable
+    fast, but clears undo
+    
+Which do you prefer?'''
+    button = cmds.confirmDialog(title='Confirm', message=message,
+                                button=['Undoable','Fast'],
+                                defaultButton='Undoable',
+                                cancelButton='Undoable',
+                                dismissString='Undoable')
+    if button == 'Fast':
+        return True
+    else:
+        return False
 
 def readPinocchioWeights(weightFile):
     weightList = []
@@ -371,14 +387,20 @@ def getShape( transform, **kwargs ):
     except IndexError:
         pass
 
-def getChildren(self, **kwargs ):
+def getChildren(self, **kwargs):
     kwargs['children'] = True
     kwargs.pop('c',None)
+    fullPath = kwargs.get('fullPath', kwargs.get('f', None))
+    if fullPath is None:
+        kwargs['fullPath'] = True
     return listForNone(cmds.listRelatives( self, **kwargs))
 
 def getParent(transform, **kwargs):
     kwargs['parent'] = True
     kwargs.pop('p', None)
+    fullPath = kwargs.get('fullPath', kwargs.get('f', None))
+    if fullPath is None:
+        kwargs['fullPath'] = True
     return cmds.listRelatives( transform, **kwargs)[0]
 
 def addShape( origShape, **kwargs ):
