@@ -297,48 +297,74 @@ def runPinocchioBin(meshFile, weightFile, fit=False):
         exeAndArgs.append('-fit')
     subprocess.check_call(exeAndArgs)
 
-def heatWeight(rootJoint=None, mesh=None, skin=None, fit=False):
-    if rootJoint is None or mesh is None:
-        sel = cmds.ls(sl=1)
-        if rootJoint is None:
-            rootJoint = sel.pop(0)
-        if mesh is None:
-            mesh = sel[0]
+def heatWeight(*args, **kwargs):
+    if not args:
+        args = listForNone(cmds.ls(sl=1))
     
-    if skin is None:
-        skinClusters = getSkinClusters(mesh)
-        if skinClusters:
-            skin = skinClusters[0]
+    skin = kwargs.pop('skin', None)
+    fit = kwargs.pop('fit', False)
+    
+    inputArgsMessage = "Select one root joint and meshes you wish to weight"
+    meshes = []
+    rootJoint = None
+    for arg in args:
+        if isATypeOf(arg, 'joint'):
+            if rootJoint is None:
+                rootJoint = arg
+            else:
+                api.MGlobal.displayError("Error: multiple joints - " +
+                                         inputArgsMessage)
+                return False
+        elif isATypeOf(arg, 'mesh'):
+            meshes.append(arg)
         else:
-            skin = cmds.skinCluster(mesh, rootJoint, rui=False)[0]
+            api.MGlobal.displayError(("Error: not a poly mesh or joint: %s - "%
+                                     arg) + inputArgsMessage)
+            return False
     
-    tempArgs={}
-    if KEEP_PINOC_INPUT_FILES:
-        objFilePath = os.path.join(_PINOCCHIO_DIR, 'mayaToPinocModel.obj')
-    else:
-        objFileHandle, objFilePath = tempfile.mkstemp('.obj', **tempArgs)
-        os.close(objFileHandle)
-    try:
+    for mesh in meshes:
+        if rootJoint is None or mesh is None:
+            sel = cmds.ls(sl=1)
+            if rootJoint is None:
+                rootJoint = sel.pop(0)
+            if mesh is None:
+                mesh = sel[0]
+        
+        if skin is None:
+            skinClusters = getSkinClusters(mesh)
+            if skinClusters:
+                skin = skinClusters[0]
+            else:
+                skin = cmds.skinCluster(mesh, rootJoint, rui=False)[0]
+        
+        tempArgs={}
         if KEEP_PINOC_INPUT_FILES:
-            skelFilePath = os.path.join(_PINOCCHIO_DIR, 'mayaToPinocSkel.skel')
+            objFilePath = os.path.join(_PINOCCHIO_DIR, 'mayaToPinocModel.obj')
         else:
-            skelFileHandle, skelFilePath = tempfile.mkstemp('.skel',**tempArgs)
-            os.close(skelFileHandle)
+            objFileHandle, objFilePath = tempfile.mkstemp('.obj', **tempArgs)
+            os.close(objFileHandle)
         try:
-            skelFilePath, skelList = \
-                pinocchioSkeletonExport(rootJoint, skelFilePath)
-            objFilePath = pinocchioObjExport(mesh, objFilePath)
-            
-            runPinocchioBin(objFilePath, skelFilePath, fit=fit)
-            pinocchioWeightsImport(mesh, skin, skelList,
-                                   weightFile=os.path.join(_PINOCCHIO_DIR,
-                                                           "attachment.out"))
+            if KEEP_PINOC_INPUT_FILES:
+                skelFilePath = os.path.join(_PINOCCHIO_DIR, 'mayaToPinocSkel.skel')
+            else:
+                skelFileHandle, skelFilePath = tempfile.mkstemp('.skel',**tempArgs)
+                os.close(skelFileHandle)
+            try:
+                skelFilePath, skelList = \
+                    pinocchioSkeletonExport(rootJoint, skelFilePath)
+                objFilePath = pinocchioObjExport(mesh, objFilePath)
+                
+                runPinocchioBin(objFilePath, skelFilePath, fit=fit)
+                pinocchioWeightsImport(mesh, skin, skelList,
+                                       weightFile=os.path.join(_PINOCCHIO_DIR,
+                                                               "attachment.out"))
+            finally:
+                if not KEEP_PINOC_INPUT_FILES and os.path.isfile(skelFilePath):
+                    os.remove(skelFilePath)
         finally:
-            if not KEEP_PINOC_INPUT_FILES and os.path.isfile(skelFilePath):
-                os.remove(skelFilePath)
-    finally:
-        if not KEEP_PINOC_INPUT_FILES and os.path.isfile(objFilePath):
-            os.remove(objFilePath)
+            if not KEEP_PINOC_INPUT_FILES and os.path.isfile(objFilePath):
+                os.remove(objFilePath)
+    return True
 
 # This doesn't work - apparently demoui can't take animation data for arbitrary
 # skeletons - it requires exactly 114 entries per line??? 
