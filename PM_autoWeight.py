@@ -12,7 +12,7 @@ import PMP.pyUtils
 import PMP.maya.fileUtils
 import PMP.maya.rigging
 
-DEBUG = False
+DEBUG = True
 KEEP_PINOC_INPUT_FILES = True
 
 _PINOCCHIO_DIR = os.path.join(os.path.dirname(__file__))
@@ -35,6 +35,8 @@ def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
     try:
         for jointIndex, (joint, parentIndex) in enumerate(skelList):
             jointCoords = getTranslation(joint, space='world')
+            if DEBUG:
+                print joint, ":", jointIndex, jointCoords, parentIndex
             fileObj.write("%d %.5f %.5f %.5f %d\r\n" % (jointIndex,
                                                         jointCoords[0],
                                                         jointCoords[1],
@@ -152,6 +154,12 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None):
         apiJointIndices = api.MIntArray(numBones, 0)
         for apiIndex, joint in enumerate(influenceObjects(skin)):
             apiJointIndices.set(apiIndex, getNodeIndex(joint, pinocInfluences))
+        if DEBUG:
+            print "apiJointIndices:",
+            pyJointIndices = []
+            for i in xrange(apiJointIndices.length()):
+                pyJointIndices.append(apiJointIndices[i])
+            print pyJointIndices
         apiComponents = api.MFnSingleIndexedComponent().create(api.MFn.kMeshVertComponent)
         apiVertices = api.MIntArray(numVertices, 0)
         for i in xrange(numVertices):
@@ -312,7 +320,7 @@ def getTranslation(transform, **kwargs):
     space = kwargs.pop('space', None)
     if space == 'world':
         kwargs['worldSpace'] = True
-    return cmds.xform(transform, q=1, translation=1)
+    return cmds.xform(transform, q=1, translation=1, **kwargs)
 
 def getShape( transform, **kwargs ):
     kwargs['shapes'] = True
