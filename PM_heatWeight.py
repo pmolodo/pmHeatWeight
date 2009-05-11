@@ -88,6 +88,7 @@ def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
     return (skelFile, skelList)
 
 def pinocchioObjExport(mesh, objFilePath):
+    loadObjPlugin()
     savedSel = cmds.ls(sl=1)
     try:
         if not isATypeOf(mesh, 'geometryShape'):
@@ -487,6 +488,10 @@ def toMDagPath (nodeName):
         dagPath = api.MDagPath()
         dagFn.getPath ( dagPath )
         return dagPath
+
+def loadObjPlugin():
+    if not cmds.pluginInfo('objExport', q=1, loaded=True ):
+        cmds.loadPlugin('objExport')
 
 #==============================================================================
 # PM Scripts Replacements
