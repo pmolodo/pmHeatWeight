@@ -1,4 +1,6 @@
 '''
+version 0.5
+
 SETUP:
 ------
 Step 1: Copy the script files,
