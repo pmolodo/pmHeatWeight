@@ -26,14 +26,14 @@ def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
     Returns (skelFile, skelList), where skelList is the list returned
     by  makePinocchioSkeletonList.
     """
-    skeletonRoot = PyNode(skeletonRoot)
+    # GOT HERE - eliminating pymel
     if skelFile is None:
         skelFile = PMP.maya.fileUtils.browseForFile(m=1, actionName='Export')
     skelList = makePinocchioSkeletonList(skeletonRoot)
     fileObj = open(skelFile, mode="w")
     try:
         for jointIndex, (joint, parentIndex) in enumerate(skelList):
-            jointCoords = joint.getTranslation(space='world')
+            jointCoords = getTranslation(joint, space='world')
             fileObj.write("%d %.5f %.5f %.5f %d\r\n" % (jointIndex,
                                                         jointCoords.x,
                                                         jointCoords.y,
@@ -286,3 +286,13 @@ def autoWeight(rootJoint=None, mesh=None, skin=None, fit=False):
 #            currentTime(currentTime() + timeIncrement)
 #    finally:
 #        fileObj.close()
+
+#==============================================================================
+# Pymel Replacements
+#==============================================================================
+
+def getTranslation(transform, **kwargs):
+    space = kwargs.pop('space', None):
+    if space == 'world':
+        kwargs['worldSpace'] = True
+    return xform(q=1, translation=1)
