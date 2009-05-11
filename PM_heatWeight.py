@@ -1,6 +1,4 @@
 '''
-version 0.5
-
 SETUP:
 ------
 Step 1: Copy the script files,
@@ -39,6 +37,13 @@ USAGE:
 Select the root of the skeleton you wish to weight to, then the mesh you wish
 to weight, then click the shelf button; wait a few moments for the command-
 line utility to finish, and you're done. 
+
+version 0.5.1
+
+Changelog:
+
+v0.5.1 - automatically loads obj plugin, closes open poly borders
+v0.5 - initial version
 
 copyright 2009 Paul Molodowitch
 '''
