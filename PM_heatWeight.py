@@ -46,7 +46,7 @@ This means that:
 Keep this in mind when laying out your skeleton, if you intend to weight it
 using this script.
  
-Most of the credit for this working goes to Ilya Baran & Jovan Popović, who
+Most of the credit for this working goes to Ilya Baran & Jovan Popovic, who
 published the algorithm / developed / released the source code for the
 Pinocchio auto-rigging / weighting library which this script calls!
 
