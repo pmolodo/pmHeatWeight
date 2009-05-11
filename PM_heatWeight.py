@@ -48,6 +48,15 @@ v0.5 - initial version
 copyright 2009 Paul Molodowitch
 '''
 
+#class Version(object):
+#    def __init__(*args):
+#        self.nums = args
+#    def __str__(self):
+#        return ".".join(self.nums)
+#
+#version = Version(0,5,1)
+#__doc__ = __doc__ % version
+
 import subprocess
 import tempfile
 import os
