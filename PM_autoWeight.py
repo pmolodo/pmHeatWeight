@@ -4,7 +4,9 @@ import os
 import os.path
 
 import maya.cmds as cmds
-from pymel import *
+import maya.mel as mel
+import maya.OpenMaya as api
+import maya.OpenMayaAnim as apiAnim
 
 import PMP.pyUtils
 import PMP.maya.fileUtils
@@ -13,7 +15,7 @@ import PMP.maya.rigging
 DEBUG = False
 KEEP_PINOC_INPUT_FILES = True
 
-_PINOCCHIO_DIR = os.path.join(os.path.dirname(__file__), 'Pinocchio')
+_PINOCCHIO_DIR = os.path.join(os.path.dirname(__file__))
 _PINOCCHIO_BIN = os.path.join(_PINOCCHIO_DIR, 'AttachWeights.exe')
 
 class DEFAULT_SKELETONS(object): pass
@@ -26,7 +28,6 @@ def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
     Returns (skelFile, skelList), where skelList is the list returned
     by  makePinocchioSkeletonList.
     """
-    # GOT HERE - eliminating pymel
     if skelFile is None:
         skelFile = PMP.maya.fileUtils.browseForFile(m=1, actionName='Export')
     skelList = makePinocchioSkeletonList(skeletonRoot)
@@ -35,33 +36,33 @@ def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
         for jointIndex, (joint, parentIndex) in enumerate(skelList):
             jointCoords = getTranslation(joint, space='world')
             fileObj.write("%d %.5f %.5f %.5f %d\r\n" % (jointIndex,
-                                                        jointCoords.x,
-                                                        jointCoords.y,
-                                                        jointCoords.z,
+                                                        jointCoords[0],
+                                                        jointCoords[1],
+                                                        jointCoords[2],
                                                         parentIndex))
     finally:
         fileObj.close()
     return (skelFile, skelList)
 
 def pinocchioObjExport(mesh, objFilePath):
-    mesh = PyNode(mesh)
-    savedSel = selected()
+    savedSel = cmds.ls(sl=1)
     try:
-        if (not isinstance(mesh, nodetypes.GeometryShape) and
-                hasattr(mesh, 'getShape')):
-            mesh = mesh.getShape()
-        if not isinstance(mesh, nodetypes.GeometryShape):
+        if not isATypeOf(mesh, 'geometryShape'):
+            subShape = getShape(mesh)
+            if subShape:
+                mesh = subShape
+        if not isATypeOf(mesh, 'geometryShape'):
             raise TypeError('cannot find a geometry shape for %s' % mesh)
             
-        meshDup = duplicate(mesh, addShape=True)[0]
-        polyTriangulate(meshDup, ch=0)
-        select(meshDup, r=1)
+        meshDup = addShape(mesh)
+        cmds.polyTriangulate(meshDup, ch=0)
+        cmds.select(meshDup, r=1)
         cmds.file(objFilePath,
                 op="groups=0;ptgroups=0;materials=0;smoothing=0;normals=0",
                 typ="OBJexport", es=True, f=1)
-        delete(meshDup)
+        cmds.delete(meshDup)
     finally:
-        select(savedSel)
+        cmds.select(savedSel)
     return objFilePath
 
 
@@ -75,29 +76,24 @@ def makePinocchioSkeletonList(rootJoint):
     return _makePinocchioSkeletonList([], rootJoint, -1)
 
 def _makePinocchioSkeletonList(skelList, newJoint, newJointParent):
-    newJoint = PyNode(newJoint)
-    
     newIndex = len(skelList)
     skelList.append((newJoint, newJointParent))
-    
-    jointChildren = listRelatives(newJoint, type="joint",
-                                  children=True,
-                                  noIntermediate=True)
+
+    jointChildren = listForNone(cmds.listRelatives(newJoint, type="joint",
+                                                   children=True,
+                                                   noIntermediate=True))
     for joint in jointChildren:
         _makePinocchioSkeletonList(skelList, joint, newIndex)
     return skelList
 
 def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None):
-    mesh = PyNode(mesh)
-    skin = PyNode(skin)
-    
     #Ensure that all influences in the skelList are influences for the skin
-    allInfluences = skin.influenceObjects()
+    allInfluences = influenceObjects(skin)
     pinocInfluences = [joint for joint, parent in skelList]
     for joint in pinocInfluences:
-        if joint not in allInfluences:
-            skin.addInfluence(joint)
-    
+        if not nodeIn(joint, allInfluences):
+            cmds.skinCluster(skin, edit=1, addInfluence=joint)
+
     if weightFile is None:
         weightFile = PMP.maya.fileUtils.browseForFile(m=0, actionName='Import')
     vertBoneWeights = readPinocchioWeights(weightFile)
@@ -146,7 +142,7 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None):
                 break
             
     # Zero all weights
-    skinPercent(skin, mesh, pruneWeights=100, normalize=False)
+    cmds.skinPercent(skin, mesh, pruneWeights=100, normalize=False)
 
     if confirmNonUndoableMethod():
         apiWeights = api.MDoubleArray(numWeights, 0)
@@ -154,19 +150,19 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None):
             for jointIndex, jointValue in enumerate(jointWeights):
                 apiWeights.set(jointValue, vertIndex * numBones + jointIndex)
         apiJointIndices = api.MIntArray(numBones, 0)
-        for apiIndex, joint in enumerate(skin.influenceObjects()):
-            apiJointIndices.set(apiIndex, pinocInfluences.index(joint))
+        for apiIndex, joint in enumerate(influenceObjects(skin)):
+            apiJointIndices.set(apiIndex, getNodeIndex(joint, pinocInfluences))
         apiComponents = api.MFnSingleIndexedComponent().create(api.MFn.kMeshVertComponent)
-        apiVertices = api.MIntArray(mesh.numVertices(), 0)
-        for i in xrange(mesh.numVertices()):
+        apiVertices = api.MIntArray(numVertices, 0)
+        for i in xrange(numVertices):
             apiVertices.set(i, i)
         api.MFnSingleIndexedComponent(apiComponents).addElements(apiVertices) 
-        mfnSkin = skin.__apimfn__()
+        mfnSkin = apiAnim.MFnSkinCluster(toMObject(skin))
         oldWeights = api.MDoubleArray()
-        undoState = undoInfo(q=1, state=1)
-        undoInfo(state=False)
+        undoState = cmds.undoInfo(q=1, state=1)
+        cmds.undoInfo(state=False)
         try:
-            mfnSkin.setWeights(mesh.__apimdagpath__(),
+            mfnSkin.setWeights(toMDagPath(mesh),
                                apiComponents,
                                apiJointIndices,
                                apiWeights,
@@ -174,7 +170,7 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None):
                                oldWeights)
         finally:
             cmds.flushUndo()
-            undoInfo(state=undoState)
+            cmds.undoInfo(state=undoState)
     else:
         cmds.progressWindow(title="Setting new weights...", isInterruptable=True,
                             max=numVertices)
@@ -196,8 +192,8 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None):
                                     status="Setting Vert: (%i of %i)" % (progress, numVertices))
                 lastUpdateTime = cmds.timerX()
 
-            skinPercent(skin, mesh.vtx[vertIndex], normalize=False,
-                        transformValue=jointValues.items())
+            cmds.skinPercent(skin, mesh.vtx[vertIndex], normalize=False,
+                             transformValue=jointValues.items())
         cmds.progressWindow(endProgress=True)    
 
 def confirmNonUndoableMethod():
@@ -223,18 +219,18 @@ def runPinocchioBin(meshFile, weightFile, fit=False):
 
 def autoWeight(rootJoint=None, mesh=None, skin=None, fit=False):
     if rootJoint is None or mesh is None:
-        sel = selected()
+        sel = cmds.ls(sl=1)
         if rootJoint is None:
             rootJoint = sel.pop(0)
         if mesh is None:
             mesh = sel[0]
     
     if skin is None:
-        skinClusters = PMP.maya.rigging.getSkinClusters(mesh)
+        skinClusters = getSkinClusters(mesh)
         if skinClusters:
             skin = skinClusters[0]
         else:
-            skin = skinCluster(mesh, rootJoint, rui=False)[0]
+            skin = cmds.skinCluster(mesh, rootJoint, rui=False)[0]
     
     tempArgs={}
     if KEEP_PINOC_INPUT_FILES:
@@ -280,19 +276,183 @@ def autoWeight(rootJoint=None, mesh=None, skin=None, fit=False):
 #        currentTime(startTime)
 #        while currentTime() <= endTime:
 #            for joint, parent in skelList:
-#                for coord in joint.getTranslation(space='world'): 
+#                for coord in getTranslation(joint, space='world'): 
 #                    fileObj.write('%f ' % coord)
 #            fileObj.write('\n')
 #            currentTime(currentTime() + timeIncrement)
 #    finally:
 #        fileObj.close()
 
+def nodeIn(node, nodeList):
+    for compNode in nodeList:
+        if isSameObject(node, compNode):
+            return True
+    else:
+        return False
+    
+def getNodeIndex(node, nodeList):
+    for i, compNode in enumerate(nodeList):
+        if isSameObject(node, compNode):
+            return i
+    else:
+        return None
+
+def isSameObject(node1, node2):
+    return mel.eval('isSameObject("%s", "%s")' % (node1, node2))
 #==============================================================================
 # Pymel Replacements
 #==============================================================================
 
+def listForNone( res ):
+    if res is None:
+        return []
+    return res
+
 def getTranslation(transform, **kwargs):
-    space = kwargs.pop('space', None):
+    space = kwargs.pop('space', None)
     if space == 'world':
         kwargs['worldSpace'] = True
-    return xform(q=1, translation=1)
+    return cmds.xform(transform, q=1, translation=1)
+
+def getShape( transform, **kwargs ):
+    kwargs['shapes'] = True
+    try:
+        return getChildren(transform, **kwargs )[0]            
+    except IndexError:
+        pass
+
+def getChildren(self, **kwargs ):
+    kwargs['children'] = True
+    kwargs.pop('c',None)
+    return listForNone(cmds.listRelatives( self, **kwargs))
+
+def getParent(transform, **kwargs):
+    kwargs['parent'] = True
+    kwargs.pop('p', None)
+    return cmds.listRelatives( transform, **kwargs)[0]
+
+def addShape( origShape, **kwargs ):
+    """
+    origShape will be duplicated and added under the existing parent transform
+        (instead of duplicating the parent transform)
+    """
+    kwargs['returnRootsOnly'] = True
+    kwargs.pop('rr', None)
+    
+    for invalidArg in ('renameChildren', 'rc', 'instanceLeaf', 'ilf',
+                       'parentOnly', 'po', 'smartTransform', 'st'):
+        if kwargs.get(invalidArg, False) :
+            raise ValueError("addShape: argument %r may not be used with 'addShape' argument" % invalidArg)
+    name=kwargs.pop('name', kwargs.pop('n', None))
+                
+    if 'shape' not in cmds.nodeType(origShape, inherited=True):
+        raise TypeError('addShape argument to be a shape (%r)'
+                        % origShape)
+
+    # This is somewhat complex, because if we have a transform with
+    # multiple shapes underneath it,
+    #   a) The transform and all shapes are always duplicated
+    #   b) After duplication, there is no reliable way to distinguish
+    #         which shape is the duplicate of the one we WANTED to
+    #         duplicate (cmds.shapeCompare does not work on all types
+    #         of shapes - ie, subdivs)
+    
+    # To get around this, we:
+    # 1) duplicate the transform ONLY (result: dupeTransform1)
+    # 2) instance the shape we want under the new transform
+    #    (result: dupeTransform1|instancedShape)
+    # 3) duplicate the new transform
+    #    (result: dupeTransform2, dupeTransform2|duplicatedShape)
+    # 4) delete the transform with the instance (delete dupeTransform1)
+    # 5) place an instance of the duplicated shape under the original
+    #    transform (result: originalTransform|duplicatedShape)
+    # 6) delete the extra transform (delete dupeTransform2)
+    # 7) rename the final shape (if requested)
+    
+    # 1) duplicate the transform ONLY (result: dupeTransform1)
+    dupeTransform1 = cmds.duplicate(origShape, parentOnly=1)[0]
+
+    # 2) instance the shape we want under the new transform
+    #    (result: dupeTransform1|instancedShape)
+    cmds.parent(origShape, dupeTransform1, shape=True, addObject=True,
+                relative=True)
+    
+    # 3) duplicate the new transform
+    #    (result: dupeTransform2, dupeTransform2|duplicatedShape)
+    dupeTransform2 = cmds.duplicate(dupeTransform1, **kwargs)[0]
+
+    # 4) delete the transform with the instance (delete dupeTransform1)
+    cmds.delete(dupeTransform1)
+
+    # 5) place an instance of the duplicated shape under the original
+    #    transform (result: originalTransform|duplicatedShape)
+    newShape = cmds.parent(getShape(dupeTransform2),
+                           getParent(origShape),
+                           shape=True, addObject=True,
+                           relative=True)[0]
+
+    # 6) delete the extra transform (delete dupeTransform2)
+    cmds.delete(dupeTransform2)
+    
+    # 7) rename the final shape (if requested)
+    if name is not None:
+        newShape = cmds.rename(newShape, name)
+    
+    cmds.select(newShape, r=1)
+    return newShape
+
+def influenceObjects(skinCluster):
+    mfnSkin = apiAnim.MFnSkinCluster(toMObject(skinCluster))
+    dagPaths = api.MDagPathArray()
+    mfnSkin.influenceObjects(dagPaths)
+    influences = []
+    for i in xrange(dagPaths.length()):
+        influences.append(dagPaths[i].fullPathName())
+    return influences
+
+def isValidMObject (obj):
+    if isinstance(obj, api.MObject) :
+        return not obj.isNull()
+    else :
+        return False
+
+def toMObject (nodeName):
+    """ Get the API MObject given the name of an existing node """ 
+    sel = api.MSelectionList()
+    obj = api.MObject()
+    result = None
+    try :
+        sel.add( nodeName )
+        sel.getDependNode( 0, obj )
+        if isValidMObject(obj) :
+            result = obj 
+    except :
+        pass
+    return result
+
+def toMDagPath (nodeName):
+    """ Get an API MDagPAth to the node, given the name of an existing dag node """ 
+    obj = toMObject (nodeName)
+    if obj :
+        dagFn = api.MFnDagNode (obj)
+        dagPath = api.MDagPath()
+        dagFn.getPath ( dagPath )
+        return dagPath
+
+#==============================================================================
+# PM Scripts Replacements
+#==============================================================================
+
+def isATypeOf(node, type):
+    """Returns true if node is of the given type, or inherits from it."""
+    if isinstance(node, basestring) and cmds.objExists(node):
+        return type in cmds.nodeType(node, inherited=True)
+    else:
+        return False
+    
+def getSkinClusters(mesh):
+    """
+    Returns a list of skinClusters attached the given mesh.
+    """
+    return [x for x in listForNone(cmds.listHistory(mesh))
+            if isATypeOf(x, 'skinCluster')]
