@@ -146,7 +146,8 @@ def _makePinocchioSkeletonList(skelList, newJoint, newJointParent):
         _makePinocchioSkeletonList(skelList, joint, newIndex)
     return skelList
 
-def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None):
+def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
+                           undoable=False):
     #Ensure that all influences in the skelList are influences for the skin
     allInfluences = influenceObjects(skin)
     pinocInfluences = [joint for joint, parent in skelList]
@@ -204,7 +205,7 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None):
     # Zero all weights
     cmds.skinPercent(skin, mesh, pruneWeights=100, normalize=False)
 
-    if confirmNonUndoableMethod():
+    if not undoable:
         apiWeights = api.MDoubleArray(numWeights, 0)
         for vertIndex, jointWeights in enumerate(vertJointWeights):
             for jointIndex, jointValue in enumerate(jointWeights):
@@ -262,7 +263,7 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None):
                              transformValue=jointValues.items())
         cmds.progressWindow(endProgress=True)    
 
-def confirmNonUndoableMethod():
+def useUndoableMethod():
     message = \
     '''This script works in two modes:
     slow, but undoable
@@ -275,9 +276,9 @@ Which do you prefer?'''
                                 cancelButton='Undoable',
                                 dismissString='Undoable')
     if button == 'Fast':
-        return True
-    else:
         return False
+    else:
+        return True
 
 def readPinocchioWeights(weightFile):
     weightList = []
@@ -301,9 +302,7 @@ def heatWeight(*args, **kwargs):
     if not args:
         args = listForNone(cmds.ls(sl=1))
     
-    skin = kwargs.pop('skin', None)
     fit = kwargs.pop('fit', False)
-    undoable = kwargs.pop('undoable', False)
     
     inputArgsMessage = "Select one root joint and meshes you wish to weight"
     meshes = []
@@ -344,6 +343,8 @@ def heatWeight(*args, **kwargs):
                 inputArgsMessage)
             return False
     
+    undoable = kwargs.pop('undoable', useUndoableMethod())
+    
     for mesh in meshes:
         try:
             if rootJoint is None or mesh is None:
@@ -353,12 +354,11 @@ def heatWeight(*args, **kwargs):
                 if mesh is None:
                     mesh = sel[0]
             
-            if skin is None:
-                skinClusters = getSkinClusters(mesh)
-                if skinClusters:
-                    skin = skinClusters[0]
-                else:
-                    skin = cmds.skinCluster(mesh, rootJoint, rui=False)[0]
+            skinClusters = getSkinClusters(mesh)
+            if skinClusters:
+                skin = skinClusters[0]
+            else:
+                skin = cmds.skinCluster(mesh, rootJoint, rui=False)[0]
             
             tempArgs={}
             if KEEP_PINOC_INPUT_FILES:
