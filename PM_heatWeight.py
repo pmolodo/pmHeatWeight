@@ -199,8 +199,8 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
     vertBoneWeights = readPinocchioWeights(weightFile)
     numVertices = len(vertBoneWeights)
     numBones = len(vertBoneWeights[0])
-    numWeights = numVertices * numBones
     numJoints = len(skelList)
+    numWeights = numVertices * numJoints
     if DEBUG:
         print "numVertices:", numVertices
         print "numBones:", numBones
@@ -213,7 +213,7 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
     boneIndexToJointIndex = [0] * numBones
     vertJointWeights = [[0] * numJoints for i in xrange(numVertices)]
 
-    assignBoneToEndJoint = True
+    assignBoneToEndJoint = False
     if assignBoneToEndJoint:
         for jointIndex in xrange(1, numJoints):
             boneIndexToJointIndex[jointIndex - 1] = jointIndex
@@ -248,8 +248,8 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
         apiWeights = api.MDoubleArray(numWeights, 0)
         for vertIndex, jointWeights in enumerate(vertJointWeights):
             for jointIndex, jointValue in enumerate(jointWeights):
-                apiWeights.set(jointValue, vertIndex * numBones + jointIndex)
-        apiJointIndices = api.MIntArray(numBones, 0)
+                apiWeights.set(jointValue, vertIndex * numJoints + jointIndex)
+        apiJointIndices = api.MIntArray(numJoints, 0)
         for apiIndex, joint in enumerate(influenceObjects(skin)):
             apiJointIndices.set(apiIndex, getNodeIndex(joint, pinocInfluences))
         if DEBUG:
