@@ -94,7 +94,7 @@ class Version(object):
     def __str__(self):
         return ".".join([str(x) for x in self.nums])
 
-version = Version(0,5,2)
+version = Version(0,6)
 __doc__ = __doc__ % str(version)
 
 import subprocess
