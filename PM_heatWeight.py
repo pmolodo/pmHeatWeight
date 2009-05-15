@@ -82,6 +82,7 @@ version %s
 
 Changelog:
 
+v0.6   - first public release! 
 v0.5.2 - changed input format - now can select multiple meshes
 v0.5.1 - automatically loads obj plugin, closes open poly borders
 v0.5 - initial version
