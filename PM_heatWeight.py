@@ -24,6 +24,20 @@
 #==============================================================================
 
 '''
+DESCRIPTION:
+------------
+This is an auto-weighting script for attaching a joint skeleton to a poly mesh
+skin.  It acts as a front-end to Ilya Baran & Jovan Popovic's "Pinocchio"
+auto-rigging and weighting library.  (see http://www.mit.edu/~ibaran/autorig/).
+Specifically, it uses their heat-weighting algorithm (also implemented in
+Blender) to provide MUCH better default weights than Maya's bind skin weights.
+
+Currently, since it interface's to the Pinocchio executable, it is only
+available on windows.  The source for building the binary  is available at:
+http://github.com/elrond79/Pinocchio/tree/master
+... if you want to try compiling a binary for another system.  (Note - the
+source has only very minor modifications from that released by Ilya and Jovan.)
+
 SETUP:
 ------
 Step 1: Copy the script files,
@@ -74,9 +88,7 @@ using this script.
 Most of the credit for this working  as nicely as it does goes to Ilya Baran &
 Jovan Popovic, who published the algorithm / developed / released the source
 code for the Pinocchio auto-rigging / weighting utility, which this script
-makes use of!  The source-code for the version of Pinocchio used by this
-script is available at:
-http://github.com/elrond79/Pinocchio/tree/master
+makes use of!
 
 version %s
 
