@@ -71,11 +71,14 @@ This means that:
 Keep this in mind when laying out your skeleton, if you intend to weight it
 using this script.
  
-Most of the credit for this working goes to Ilya Baran & Jovan Popovic, who
-published the algorithm / developed / released the source code for the
-Pinocchio auto-rigging / weighting library which this script makes use of!
+Most of the credit for this working  as nicely as it does goes to Ilya Baran &
+Jovan Popovic, who published the algorithm / developed / released the source
+code for the Pinocchio auto-rigging / weighting utility, which this script
+makes use of!  The source-code for the version of Pinocchio used by this
+script is available at:
+http://github.com/elrond79/Pinocchio/tree/master
 
-version 0.5.2
+version %s
 
 Changelog:
 
@@ -84,14 +87,14 @@ v0.5.1 - automatically loads obj plugin, closes open poly borders
 v0.5 - initial version
 '''
 
-#class Version(object):
-#    def __init__(*args):
-#        self.nums = args
-#    def __str__(self):
-#        return ".".join(self.nums)
-#
-#version = Version(0,5,1)
-#__doc__ = __doc__ % version
+class Version(object):
+    def __init__(self, *args):
+        self.nums = args
+    def __str__(self):
+        return ".".join([str(x) for x in self.nums])
+
+version = Version(0,5,2)
+__doc__ = __doc__ % str(version)
 
 import subprocess
 import tempfile
@@ -210,7 +213,7 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
     boneIndexToJointIndex = [0] * numBones
     vertJointWeights = [[0] * numJoints for i in xrange(numVertices)]
 
-    assignBoneToEndJoint = False
+    assignBoneToEndJoint = True
     if assignBoneToEndJoint:
         for jointIndex in xrange(1, numJoints):
             boneIndexToJointIndex[jointIndex - 1] = jointIndex
@@ -348,7 +351,7 @@ def heatWeight(*args, **kwargs):
             if rootJoint is None:
                 rootJoint = arg
             else:
-                api.MGlobal.displayError("Error: multiple joints - " +
+                api.MGlobal.displayError("multiple joints - " +
                                          inputArgsMessage)
                 return False
         elif isATypeOf(arg, 'mesh'):
@@ -357,26 +360,26 @@ def heatWeight(*args, **kwargs):
             shapes = [x for x in getShapes(arg) if isATypeOf(x, 'mesh')]
             if len(shapes) == 0: 
                 api.MGlobal.displayWarning(
-                    "Warning: transform has no poly shape: %s - " % arg)
+                    "transform has no poly shape: %s" % arg)
             else:
                 meshes.extend(shapes) 
         else:
             api.MGlobal.displayError(
-                ("Error: not a poly mesh, transform, or joint: %s - " % arg) +
+                ("not a poly mesh, transform, or joint: %s - " % arg) +
                 inputArgsMessage)
             return False
+    if rootJoint is None:
+        api.MGlobal.displayError("no root joint - "  + inputArgsMessage)
+    if not meshes:
+        api.MGlobal.displayError("no meshes - "  + inputArgsMessage)
     
-    undoable = kwargs.pop('undoable', useUndoableMethod())
+    if 'undoable' in kwargs:
+        undoable = kwargs['undoable']
+    else:
+        undoable = useUndoableMethod()
     
     for mesh in meshes:
         try:
-            if rootJoint is None or mesh is None:
-                sel = cmds.ls(sl=1)
-                if rootJoint is None:
-                    rootJoint = sel.pop(0)
-                if mesh is None:
-                    mesh = sel[0]
-            
             skinClusters = getSkinClusters(mesh)
             if skinClusters:
                 skin = skinClusters[0]
