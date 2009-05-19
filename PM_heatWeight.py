@@ -90,10 +90,19 @@ Jovan Popovic, who published the algorithm / developed / released the source
 code for the Pinocchio auto-rigging / weighting utility, which this script
 makes use of!
 
+New releases will be posted to highend3d.com (go to
+http://www.highend3d.com/maya/downloads/mel_scripts/character/5753.html
+or search for 'PM_heatWeight' in the maya downloads if that link is outdated);
+if you wish to contact me regarding this script, either leave a message on the
+forum there, or email me at heatWeight DOT calin79, domain neverbox DOT com.
+(If you're not a spam bot, you should hopefully be able to figure out the
+correct formatting of that email address...) 
+
 version %s
 
 Changelog:
 
+v0.6.1   - maya 8.5 / 2008 support
 v0.6   - first public release! 
 v0.5.2 - changed input format - now can select multiple meshes
 v0.5.1 - automatically loads obj plugin, closes open poly borders
@@ -106,7 +115,7 @@ class Version(object):
     def __str__(self):
         return ".".join([str(x) for x in self.nums])
 
-version = Version(0,6)
+version = Version(0,6,1)
 __doc__ = __doc__ % str(version)
 
 import subprocess
@@ -125,8 +134,7 @@ KEEP_PINOC_INPUT_FILES = True
 _PINOCCHIO_DIR = os.path.join(os.path.dirname(__file__))
 _PINOCCHIO_BIN = os.path.join(_PINOCCHIO_DIR, 'AttachWeights.exe')
 
-class DEFAULT_SKELETONS(object): pass
-class HUMAN_SKELETON(DEFAULT_SKELETONS): pass
+class PinocchioError(Exception): pass
 
 def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
     """
@@ -348,7 +356,9 @@ def runPinocchioBin(meshFile, weightFile, fit=False):
     exeAndArgs = [_PINOCCHIO_BIN, meshFile, '-skel', weightFile]
     if fit:
         exeAndArgs.append('-fit')
-    subprocess.check_call(exeAndArgs)
+    returnVal = subprocess.call(exeAndArgs)
+    if returnVal != 0:
+        raise PinoccchioError("return code: %d", returnVal)
 
 def heatWeight(*args, **kwargs):
     if not args:
