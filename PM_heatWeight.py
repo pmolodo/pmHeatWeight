@@ -84,11 +84,21 @@ This means that:
        'closer' BONE
 Keep this in mind when laying out your skeleton, if you intend to weight it
 using this script.
- 
+
+ALL HAIL TO:
+------------
 Most of the credit for this working  as nicely as it does goes to Ilya Baran &
 Jovan Popovic, who published the algorithm / developed / released the source
 code for the Pinocchio auto-rigging / weighting utility, which this script
 makes use of!
+
+Thanks to Sam Hodge (samhodge1972 on highend3d) for the linux port of the
+binary!
+
+RELEASE INFO:
+-------------
+
+version %s
 
 New releases will be posted to highend3d.com (go to
 http://www.highend3d.com/maya/downloads/mel_scripts/character/5753.html
@@ -98,10 +108,9 @@ forum there, or email me at heatWeight DOT calin79, domain neverbox DOT com.
 (If you're not a spam bot, you should hopefully be able to figure out the
 correct formatting of that email address...) 
 
-version %s
-
 Changelog:
 
+v0.6.2   - linux support! Thanks to 
 v0.6.1   - maya 8.5 / 2008 support
 v0.6   - first public release! 
 v0.5.2 - changed input format - now can select multiple meshes
@@ -115,7 +124,7 @@ class Version(object):
     def __str__(self):
         return ".".join([str(x) for x in self.nums])
 
-version = Version(0,6,1)
+version = Version(0,6,2)
 __doc__ = __doc__ % str(version)
 
 import subprocess
