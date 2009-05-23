@@ -144,6 +144,7 @@ _PINOCCHIO_DIR = os.path.join(os.path.dirname(__file__))
 _PINOCCHIO_BIN = os.path.join(_PINOCCHIO_DIR, 'AttachWeights.exe')
 
 class PinocchioError(Exception): pass
+class BinaryNotFoundError(PinocchioError): pass
 
 def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
     """
@@ -275,6 +276,9 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
     cmds.skinPercent(skin, mesh, pruneWeights=100, normalize=False)
 
     if not undoable:
+        # Use the api methods to set skin weights - MUCH faster than using
+        # mel skinPercent, but api doesn't have built-in undo support, so
+        # flush the undo queue
         apiWeights = api.MDoubleArray(numWeights, 0)
         for vertIndex, jointWeights in enumerate(vertJointWeights):
             for jointIndex, jointValue in enumerate(jointWeights):
@@ -308,6 +312,7 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
             cmds.flushUndo()
             cmds.undoInfo(state=undoState)
     else:
+        # Use mel skinPercent - much slower, but undoable
         cmds.progressWindow(title="Setting new weights...", isInterruptable=True,
                             max=numVertices)
         lastUpdateTime = cmds.timerX()
@@ -336,11 +341,11 @@ def useUndoableMethod():
     message = \
     '''This script works in two modes:
     slow, but undoable
-    fast, but clears undo
+    faster, but clears undo
     
 Which do you prefer?'''
     button = cmds.confirmDialog(title='Confirm', message=message,
-                                button=['Undoable','Fast'],
+                                button=['Undoable','Faster'],
                                 defaultButton='Undoable',
                                 cancelButton='Undoable',
                                 dismissString='Undoable')
@@ -361,6 +366,9 @@ def readPinocchioWeights(weightFile):
 
 def runPinocchioBin(meshFile, weightFile, fit=False):
     # Change current directory to ensure we know where attachment.out will be
+    if not os.path.isfile(_PINOCCHIO_BIN):
+        raise BinaryNotFoundError("Could not find the binary: %s" %
+                                  _PINOCCHIO_BIN)
     os.chdir(_PINOCCHIO_DIR)
     exeAndArgs = [_PINOCCHIO_BIN, meshFile, '-skel', weightFile]
     if fit:
@@ -402,8 +410,10 @@ def heatWeight(*args, **kwargs):
             return False
     if rootJoint is None:
         api.MGlobal.displayError("no root joint - "  + inputArgsMessage)
+        return False
     if not meshes:
         api.MGlobal.displayError("no meshes - "  + inputArgsMessage)
+        return False
     
     if 'undoable' in kwargs:
         undoable = kwargs['undoable']
