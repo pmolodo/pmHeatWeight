@@ -85,6 +85,16 @@ This means that:
 Keep this in mind when laying out your skeleton, if you intend to weight it
 using this script.
 
+You may also invoke the script from a python command-line / script editor, for
+additional options:
+
+>>> import PM_heatWeight; PM_heatWeight.heatWeight()
+
+For full details on the additional options available, do:
+
+>>> import PM_heatWeight; help(PM_heatWeight.heatWeight)
+
+
 ALL HAIL TO:
 ------------
 Most of the credit for this working  as nicely as it does goes to Ilya Baran &
@@ -110,12 +120,15 @@ correct formatting of that email address...)
 
 Changelog:
 
-v0.6.2   - linux support! Thanks to 
-v0.6.1   - maya 8.5 / 2008 support
+(Coming soon in the next version... linux support!
+Thanks to Sam Hodge for this!)
+
+v0.6.2 - added an optional 'stiffness' parameter 
+v0.6.1 - maya 8.5 / 2008 support
 v0.6   - first public release! 
 v0.5.2 - changed input format - now can select multiple meshes
 v0.5.1 - automatically loads obj plugin, closes open poly borders
-v0.5 - initial version
+v0.5   - initial version
 '''
 
 class Version(object):
@@ -344,12 +357,14 @@ def useUndoableMethod():
     faster, but clears undo
     
 Which do you prefer?'''
+    undoable = 'Undoable'
+    faster = 'Faster'
     button = cmds.confirmDialog(title='Confirm', message=message,
-                                button=['Undoable','Faster'],
-                                defaultButton='Undoable',
-                                cancelButton='Undoable',
-                                dismissString='Undoable')
-    if button == 'Fast':
+                                button=[undoable,faster],
+                                defaultButton=undoable,
+                                cancelButton=undoable,
+                                dismissString=undoable)
+    if button == faster:
         return False
     else:
         return True
@@ -364,24 +379,51 @@ def readPinocchioWeights(weightFile):
         fileObj.close()
     return weightList
 
-def runPinocchioBin(meshFile, weightFile, fit=False):
+def runPinocchioBin(meshFile, weightFile, fit=False, stiffness=1.0):
     # Change current directory to ensure we know where attachment.out will be
     if not os.path.isfile(_PINOCCHIO_BIN):
         raise BinaryNotFoundError("Could not find the binary: %s" %
                                   _PINOCCHIO_BIN)
     os.chdir(_PINOCCHIO_DIR)
-    exeAndArgs = [_PINOCCHIO_BIN, meshFile, '-skel', weightFile]
+    exeAndArgs = [_PINOCCHIO_BIN, meshFile, '-skel', weightFile,
+                  '-stiffness', str(stiffness)]
     if fit:
         exeAndArgs.append('-fit')
+    
     returnVal = subprocess.call(exeAndArgs)
     if returnVal != 0:
         raise PinoccchioError("return code: %d", returnVal)
 
 def heatWeight(*args, **kwargs):
+    """
+    heatWeight(*rootAndMeshes, **kwargs)
+    
+    The non-keyword args should consist of exactly one skeleton root, and
+    at least one mesh you wish to weight to that skeleton. If no args are
+    given, the current selection is used.
+    
+    Valid keyword args:
+    undoable=False
+        Specify whether to assign skin weights using a slower, but undoable
+        method, or a faster method that requires flushing the undo queue.
+    stiffness=1.0
+        Specify how 'stiff' to make the binding to the skeleton. The higher
+        the value, the more tightly vertices will be bound to the joint
+        deemed 'closest', and the less weights will 'bleed'.
+        Note that if a joint is relatively 'far' from all bones, then modifying
+        this value still may not have much effect, as (in essence) the computer
+        is unsure WHICH bone the joint should be more stiffly bound to. This
+        situation can result when, for instance, you have a very round, fat
+        character.  In this case, the best idea is to either add bones which
+        are 'closer' to the problem area, or simply correct it with weight
+        painting afterward.  (This script is not meant to replace weight
+        painting, but merely to give you a better place to start from!)
+    """
     if not args:
         args = listForNone(cmds.ls(sl=1))
     
     fit = kwargs.pop('fit', False)
+    stiffness = kwargs.pop('stiffness', 1.0)
     
     inputArgsMessage = "Select one root joint and meshes you wish to weight"
     meshes = []
@@ -445,7 +487,8 @@ def heatWeight(*args, **kwargs):
                         pinocchioSkeletonExport(rootJoint, skelFilePath)
                     objFilePath = pinocchioObjExport(mesh, objFilePath)
                     
-                    runPinocchioBin(objFilePath, skelFilePath, fit=fit)
+                    runPinocchioBin(objFilePath, skelFilePath, fit=fit,
+                                    stiffness=stiffness)
                     pinocchioWeightsImport(mesh, skin, skelList,
                                            weightFile=os.path.join(_PINOCCHIO_DIR,
                                                                    "attachment.out"))
@@ -458,7 +501,11 @@ def heatWeight(*args, **kwargs):
         except Exception, e:
             print("warning - encountered exception while weighting mesh %s:" %
                   mesh)
-            print e
+            if DEBUG:
+                import traceback
+                traceback.print_exc()
+            else:
+                print e
     return True
 
 # This doesn't work - apparently demoui can't take animation data for arbitrary
