@@ -43,7 +43,6 @@ SETUP:
 Step 1: Copy the script files,
       /scripts/PM_heatWeight.py
       /scripts/AttachWeights.exe
-      /scripts/Pinocchio.dll
    
    to the your scripts folder: it's exact location varies depending on your os.
 
@@ -53,20 +52,21 @@ On Vista:
    C:\Users\[USER]\Documents\maya\[VERSION]\scripts
 
 Step 2: Copy In/Add to your userSetup.py
-   If the above folder did not contain a file called 'userSetup.py' (NOTE- the
-   ending is .py, NOT .mel!!!) copy in the provided one - otherwise, open it
-   and add it's contents to the end of the existing userSetup.py
-   (NOTE: On windows, use notepad or wordpad, NOT microsoft word!) 
+
+   If if you do not already have a 'userSetup.py' (NOTE- the ending is .py, NOT
+   .mel!!!) in the above foler, copy in the provided one - otherwise, open it
+   and add it's contents to the end of the existing userSetup.py (NOTE: On
+   windows, use notepad or wordpad, NOT microsoft word!)
 
 Step 3: Create a shelf icon
    With maya closed, copy:
       /prefs/icons/heatWeight.bmp
-   to:
-      /maya/[VERSION]/prefs/icons/
+   into your maya icons folder:
+      /maya/[VERSION]/prefs/icons/heatWeight.bmp
    Also, copy:
       /prefs/shelves/shelf_heatWeight.mel
-   to:
-      /maya/[VERSION]/prefs/shelves/
+   into your shelves folder:
+      /maya/[VERSION]/prefs/shelves/shelf_heatWeight.mel
    (When you start maya, you may drag the shelf button to another shelf with
    the middle mouse button, and then delete the 'heatWeight' shelf, if so
    desired.)
@@ -123,6 +123,7 @@ Changelog:
 (Coming soon in the next version... linux support!
 Thanks to Sam Hodge for this!)
 
+v0.6.3 - updated help file (no longer need a .dll since 0.6.2)
 v0.6.2 - added an optional 'stiffness' parameter 
 v0.6.1 - maya 8.5 / 2008 support
 v0.6   - first public release! 
@@ -137,7 +138,7 @@ class Version(object):
     def __str__(self):
         return ".".join([str(x) for x in self.nums])
 
-version = Version(0,6,2)
+version = Version(0,6,3)
 __doc__ = __doc__ % str(version)
 
 import subprocess
