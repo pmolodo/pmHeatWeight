@@ -1,0 +1,5 @@
+//Maya 2009 x64 Project Definition
+
+workspace -fr "templates" "assets";
+workspace -fr "mayaAscii" "scenes";
+workspace -fr "mayaBinary" "scenes";

@@ -1,0 +1,40 @@
+Should they both be visible in one working tree as directories?
+Should these be independent branches?
+
+For instance, you can fetch one into another:
+
+    $ cd project1
+    $ git config remote.project2.url /path/to/project2
+    $ git config remote.project2.fetch 'refs/heads/*:refs/project2/*'
+    $ git fetch project
+
+That will give you two (or more) branches, containing history of the
+project1 and project2. They are still completely independent, just use
+the same object store.
+
+You can merge them, for example:
+
+    $ cd project1
+    $ git merge project2/master
+
+Assuming that there is no filename collisions you'll get a repo with
+two merged histories (and two starting points). In case you get
+conflicts you can either resolve them by editing or just move the
+problematic project in subdirectory:
+
+    $ git merge -s ours --no-commit project2/master
+    Automatic merge went well; stopped before committing as requested
+
+here will be no conflicts. Merge strategy "ours" (-s ours) does not
+take anything from the branch to be merged. The coolest strategy ever.
+"--no-commit" stops the operation just before committing.
+
+    $ git read-tree --prefix=project2/ project2/master
+    $ git checkout-index -a
+    $ git commit
+
+That's it. The histories are merged and the files of project2 are
+placed in the directory "project2". It is a wee bit harder to browse
+the history of the files: you have to give both new and "old" name of
+the project2's files, as if you renamed them (that's what read-tree
+with --prefix did).
