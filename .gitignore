@@ -1,6 +1,9 @@
+._*
 *.pyc
 *~
 mayaToPinocModel.obj
 mayaToPinocSkel.skel
 skeleton.out
 attachment.out
+additionalFiles/
+additionalFiles/*
