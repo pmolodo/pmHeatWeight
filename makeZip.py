@@ -68,6 +68,7 @@ def makeZip():
     
     projectDir =  os.path.dirname(__file__)
     sourceDir = os.path.join(projectDir, "src")
+    sourceFile = os.path.join(sourceDir, 'PM_heatWeight.py')
     packagesDir = os.path.join(projectDir, "packages")
     contentsDir = os.path.join(packagesDir, "contents")
     scriptsDir = os.path.join(contentsDir, "scripts")
@@ -76,20 +77,26 @@ def makeZip():
     pinnocchioBinaries = ["AttachWeights.exe"]
     
     # import source file to get the version
-    sys.path.append(sourceDir)
-    import PM_heatWeight
-    scriptFileFromPath = PM_heatWeight.__file__
+    pmhLocals = {}
+    pmhGlobals = {}
+    try:
+        execfile(sourceFile, pmhGlobals, pmhLocals)
+    except ImportError:
+        # We may get an import error when importing maya.*
+        pass
+    
+    scriptFileFromPath = sourceFile
     scriptFileDir = os.path.dirname(scriptFileFromPath)
     sourceFileName = os.path.basename(scriptFileFromPath)
     scriptFileToPath = os.path.join(scriptsDir, sourceFileName)
     zipFilePath = os.path.join(packagesDir,
-                        ("PM_heatWeight_v%s.zip" % PM_heatWeight.version))
+                        ("PM_heatWeight_v%s.zip" % pmhLocals['version']))
 
     
     readmeFileName = "README_PM_heatWeight.txt"
     readmeFilePath = os.path.join(contentsDir, readmeFileName)
     
-    createReadmeFile(readmeFilePath, PM_heatWeight.__doc__)
+    createReadmeFile(readmeFilePath, pmhLocals['__doc__'])
     shutil.copyfile(scriptFileFromPath, scriptFileToPath)
     for bin in pinnocchioBinaries:
         binSrcPth = os.path.join(pinocchioBinariesDir, bin)
