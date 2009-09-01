@@ -32,11 +32,13 @@ auto-rigging and weighting library.  (see http://www.mit.edu/~ibaran/autorig/).
 Specifically, it uses their heat-weighting algorithm (also implemented in
 Blender) to provide MUCH better default weights than Maya's bind skin weights.
 
-Currently, since it interface's to the Pinocchio executable, it is only
-available on windows.  The source for building the binary  is available at:
+Currently, since it interface's to a Pinocchio executable, it is only
+available on windows, intel-based Mac OSX, and Linux.  The source for building the
+binary  is available at:
 http://github.com/elrond79/Pinocchio/tree/master
-... if you want to try compiling a binary for another system.  (Note - the
-source has only very minor modifications from that released by Ilya and Jovan.)
+... if you want to try compiling a binary for another system.
+(Note - the source has only very minor modifications from that released by Ilya and
+Jovan.)
 
 SETUP:
 ------
