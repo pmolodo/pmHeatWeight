@@ -42,7 +42,9 @@ SETUP:
 ------
 Step 1: Copy the script files,
       /scripts/PM_heatWeight.py
-      /scripts/AttachWeights.exe  (or /scripts/AttachWeights on Linux)
+      /scripts/AttachWeightsWin.exe  (if you're using windows)
+      /scripts/AttachWeightsMac      (if you're using intel-based OSX)
+      /scripts/AttachWeightsLinux    (if you're using linux)
    
    to the your scripts folder: it's exact location varies depending on your os.
 
@@ -50,6 +52,11 @@ On Windows XP:
    C:\Documents and Settings\[USER]\My Documents\maya\[VERSION]\scripts
 On Vista:
    C:\Users\[USER]\Documents\maya\[VERSION]\scripts
+On OSX:
+   /Users/[USER]/Library/Preferences/Autodesk/maya/[VERSION]/scripts
+On Linux:
+   ~/maya/[VERSION]/scripts
+
 
 Step 2: Copy In/Add to your userSetup.py
 
@@ -60,13 +67,13 @@ Step 2: Copy In/Add to your userSetup.py
 
 Step 3: Create a shelf icon
    With maya closed, copy:
-      /prefs/icons/heatWeight.bmp
+      /prefs/icons/heatWeight.xpm
    into your maya icons folder:
-      /maya/[VERSION]/prefs/icons/heatWeight.bmp
+      .../maya/[VERSION]/prefs/icons/heatWeight.xpm
    Also, copy:
       /prefs/shelves/shelf_heatWeight.mel
    into your shelves folder:
-      /maya/[VERSION]/prefs/shelves/shelf_heatWeight.mel
+      .../maya/[VERSION]/prefs/shelves/shelf_heatWeight.mel
    (When you start maya, you may drag the shelf button to another shelf with
    the middle mouse button, and then delete the 'heatWeight' shelf, if so
    desired.)
@@ -102,8 +109,8 @@ Jovan Popovic, who published the algorithm / developed / released the source
 code for the Pinocchio auto-rigging / weighting utility, which this script
 makes use of!
 
-Thanks to Sam Hodge (samhodge1972 on highend3d) for the linux port of the
-binary!
+Thanks to Sam Hodge (samhodge1972 on highend3d) for the initial linux port of
+the binary!
 
 RELEASE INFO:
 -------------
@@ -120,7 +127,7 @@ correct formatting of that email address...)
 
 Changelog:
 
-v0.6.4 - linux binary now included!
+v0.6.4 - linux + Mac OSX binaries now included!
 v0.6.3 - updated help file (no longer need a .dll since 0.6.2)
 v0.6.2 - added an optional 'stiffness' parameter 
 v0.6.1 - maya 8.5 / 2008 support
