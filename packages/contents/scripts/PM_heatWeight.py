@@ -32,17 +32,21 @@ auto-rigging and weighting library.  (see http://www.mit.edu/~ibaran/autorig/).
 Specifically, it uses their heat-weighting algorithm (also implemented in
 Blender) to provide MUCH better default weights than Maya's bind skin weights.
 
-Currently, since it interface's to the Pinocchio executable, it is only
-available on windows.  The source for building the binary  is available at:
+Currently, since it interface's to a Pinocchio executable, it is only
+available on windows, intel-based Mac OSX, and Linux.  The source for building the
+binary  is available at:
 http://github.com/elrond79/Pinocchio/tree/master
-... if you want to try compiling a binary for another system.  (Note - the
-source has only very minor modifications from that released by Ilya and Jovan.)
+... if you want to try compiling a binary for another system.
+(Note - the source has only very minor modifications from that released by Ilya and
+Jovan.)
 
 SETUP:
 ------
 Step 1: Copy the script files,
       /scripts/PM_heatWeight.py
-      /scripts/AttachWeights.exe
+      /scripts/AttachWeightsWin.exe  (if you're using windows)
+      /scripts/AttachWeightsMac      (if you're using intel-based OSX)
+      /scripts/AttachWeightsLinux    (if you're using linux)
    
    to the your scripts folder: it's exact location varies depending on your os.
 
@@ -50,22 +54,28 @@ On Windows XP:
    C:\Documents and Settings\[USER]\My Documents\maya\[VERSION]\scripts
 On Vista:
    C:\Users\[USER]\Documents\maya\[VERSION]\scripts
+On OSX:
+   /Users/[USER]/Library/Preferences/Autodesk/maya/[VERSION]/scripts
+On Linux:
+   ~/maya/[VERSION]/scripts
+
 
 Step 2: Copy In/Add to your userSetup.py
-   If the above folder did not contain a file called 'userSetup.py' (NOTE- the
-   ending is .py, NOT .mel!!!) copy in the provided one - otherwise, open it
-   and add it's contents to the end of the existing userSetup.py
-   (NOTE: On windows, use notepad or wordpad, NOT microsoft word!) 
+
+   If if you do not already have a 'userSetup.py' (NOTE- the ending is .py, NOT
+   .mel!!!) in the above folder, copy in the provided one - otherwise, open it
+   and add it's contents to the end of the existing userSetup.py (NOTE: On
+   windows, use notepad or wordpad, NOT microsoft word!)
 
 Step 3: Create a shelf icon
    With maya closed, copy:
-      /prefs/icons/heatWeight.bmp
-   to:
-      /maya/[VERSION]/prefs/icons/
+      /prefs/icons/heatWeight.xpm
+   into your maya icons folder:
+      .../maya/[VERSION]/prefs/icons/heatWeight.xpm
    Also, copy:
       /prefs/shelves/shelf_heatWeight.mel
-   to:
-      /maya/[VERSION]/prefs/shelves/
+   into your shelves folder:
+      .../maya/[VERSION]/prefs/shelves/shelf_heatWeight.mel
    (When you start maya, you may drag the shelf button to another shelf with
    the middle mouse button, and then delete the 'heatWeight' shelf, if so
    desired.)
@@ -101,8 +111,8 @@ Jovan Popovic, who published the algorithm / developed / released the source
 code for the Pinocchio auto-rigging / weighting utility, which this script
 makes use of!
 
-Thanks to Sam Hodge (samhodge1972 on highend3d) for the linux port of the
-binary!
+Thanks to Sam Hodge (samhodge1972 on highend3d) for the initial linux port of
+the binary!
 
 RELEASE INFO:
 -------------
@@ -119,9 +129,7 @@ correct formatting of that email address...)
 
 Changelog:
 
-(Coming soon in the next version... linux support!
-Thanks to Sam Hodge for this!)
-
+v0.6.4 - linux + Mac OSX binaries now included!
 v0.6.3 - updated help file (no longer need a .dll since 0.6.2)
 v0.6.2 - added an optional 'stiffness' parameter 
 v0.6.1 - maya 8.5 / 2008 support
@@ -137,15 +145,16 @@ class Version(object):
     def __str__(self):
         return ".".join([str(x) for x in self.nums])
 
-version = Version(0,6,3)
+version = Version(0,6,4)
 __doc__ = __doc__ % str(version)
 
 import subprocess
 import tempfile
 import os
 import os.path
+import platform
 
-import maya.cmds as cmds
+import maya.cmds as cmds #@UnresolvedImport
 import maya.mel as mel
 import maya.OpenMaya as api
 import maya.OpenMayaAnim as apiAnim
@@ -154,7 +163,15 @@ DEBUG = False
 KEEP_PINOC_INPUT_FILES = True
 
 _PINOCCHIO_DIR = os.path.join(os.path.dirname(__file__))
-_PINOCCHIO_BIN = os.path.join(_PINOCCHIO_DIR, 'AttachWeights.exe')
+_PINOCCHIO_BIN = os.path.join(_PINOCCHIO_DIR, 'AttachWeights')
+if os.name == 'nt':
+    _PINOCCHIO_BIN += '.exe'
+elif platform.system() == 'Linux':
+    _PINOCCHIO_BIN += 'Linux'
+elif platform.system() == 'Darwin':
+    _PINOCCHIO_BIN += 'Mac'
+else:
+    raise RuntimeError('Unsupported OS: %s' % platform.system())
 
 class PinocchioError(Exception): pass
 class BinaryNotFoundError(PinocchioError): pass
@@ -389,10 +406,13 @@ def runPinocchioBin(meshFile, weightFile, fit=False, stiffness=1.0):
                   '-stiffness', str(stiffness)]
     if fit:
         exeAndArgs.append('-fit')
-    
+    if DEBUG:
+        print "Calling command line binary:"
+        print 'subprocess.call(%r)' % exeAndArgs
+        print ' '.join(exeAndArgs)
     returnVal = subprocess.call(exeAndArgs)
     if returnVal != 0:
-        raise PinoccchioError("return code: %d", returnVal)
+        raise PinocchioError("return code: %d" % returnVal)
 
 def heatWeight(*args, **kwargs):
     """
