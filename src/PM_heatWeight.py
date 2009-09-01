@@ -119,9 +119,9 @@ RELEASE INFO:
 
 version %s
 
-New releases will be posted to highend3d.com (go to
-http://www.highend3d.com/maya/downloads/mel_scripts/character/5753.html
-or search for 'PM_heatWeight' in the maya downloads if that link is outdated);
+New releases will be posted to creativecrash.com (formerly highend3d.com): go to
+http://www.creativecrash.com/maya/downloads/scripts-plugins/character/c/pm-heatweight
+...or search for 'PM_heatWeight' in the maya downloads if that link is outdated);
 if you wish to contact me regarding this script, either leave a message on the
 forum there, or email me at heatWeight DOT calin79, domain neverbox DOT com.
 (If you're not a spam bot, you should hopefully be able to figure out the
