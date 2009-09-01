@@ -16,8 +16,8 @@ global proc shelf_heatWeight () {
         -label "AutoWeight: Select root joint, then mesh" 
         -labelOffset 0
         -font "tinyBoldLabelFont" 
-        -image "heatWeight.bmp"
-        -image1 "heatWeight.bmp"
+        -image "heatWeight.xpm"
+        -image1 "heatWeight.xpm"
         -style "iconOnly" 
         -marginWidth 1
         -marginHeight 1
