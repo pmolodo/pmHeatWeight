@@ -92,11 +92,11 @@ the binary!
 RELEASE INFO:
 -------------
 
-version 0.6.4
+version 0.6.5
 
-New releases will be posted to highend3d.com (go to
-http://www.highend3d.com/maya/downloads/mel_scripts/character/5753.html
-or search for 'PM_heatWeight' in the maya downloads if that link is outdated);
+New releases will be posted to creativecrash.com (formerly highend3d.com): go to
+http://www.creativecrash.com/maya/downloads/scripts-plugins/character/c/pm-heatweight
+...or search for 'PM_heatWeight' in the maya downloads if that link is outdated);
 if you wish to contact me regarding this script, either leave a message on the
 forum there, or email me at heatWeight DOT calin79, domain neverbox DOT com.
 (If you're not a spam bot, you should hopefully be able to figure out the
@@ -104,6 +104,18 @@ correct formatting of that email address...)
 
 Changelog:
 
+v0.6.5 - New parameters:
+    tempOutputDir=None
+        Specify a directory where temporary files used by the Pinocchio binary
+        are stored
+    tempDelete=True
+        Whether or not to delete the temporary files used by the Pinocchio binary
+        when finished
+    tempOverwrite=True
+        Whether or not to overwrite any existing temporary files
+    Also, should now work with multi-threading (each thread will write temp files to it's
+        own temp directory), and when exe/script file is in a location that you don't
+        have write access to
 v0.6.4 - linux + Mac OSX binaries now included!
 v0.6.3 - updated help file (no longer need a .dll since 0.6.2)
 v0.6.2 - added an optional 'stiffness' parameter 
