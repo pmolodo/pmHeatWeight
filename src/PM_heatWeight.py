@@ -129,6 +129,18 @@ correct formatting of that email address...)
 
 Changelog:
 
+v0.6.5 - New parameters:
+    tempOutputDir=None
+        Specify a directory where temporary files used by the Pinocchio binary
+        are stored
+    tempDelete=True
+        Whether or not to delete the temporary files used by the Pinocchio binary
+        when finished
+    tempOverwrite=True
+        Whether or not to overwrite any existing temporary files
+    Also, should now work with multi-threading (each thread will write temp files to it's
+        own temp directory), and when exe/script file is in a location that you don't
+        have write access to
 v0.6.4 - linux + Mac OSX binaries now included!
 v0.6.3 - updated help file (no longer need a .dll since 0.6.2)
 v0.6.2 - added an optional 'stiffness' parameter 
@@ -145,7 +157,7 @@ class Version(object):
     def __str__(self):
         return ".".join([str(x) for x in self.nums])
 
-version = Version(0,6,4)
+version = Version(0,6,5)
 __doc__ = __doc__ % str(version)
 
 import subprocess
