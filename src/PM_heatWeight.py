@@ -153,6 +153,7 @@ import tempfile
 import os
 import os.path
 import platform
+import traceback
 
 import maya.cmds as cmds #@UnresolvedImport
 import maya.mel as mel
@@ -160,7 +161,6 @@ import maya.OpenMaya as api
 import maya.OpenMayaAnim as apiAnim
 
 DEBUG = False
-KEEP_PINOC_INPUT_FILES = True
 
 _PINOCCHIO_DIR = os.path.join(os.path.dirname(__file__))
 _PINOCCHIO_BIN = os.path.join(_PINOCCHIO_DIR, 'AttachWeights')
@@ -175,6 +175,7 @@ else:
 
 class PinocchioError(Exception): pass
 class BinaryNotFoundError(PinocchioError): pass
+class CannotOverwriteError(PinocchioError): pass
 
 def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
     """
@@ -396,14 +397,17 @@ def readPinocchioWeights(weightFile):
         fileObj.close()
     return weightList
 
-def runPinocchioBin(meshFile, weightFile, fit=False, stiffness=1.0):
+def runPinocchioBin(meshFile, weightFile, fit=False, stiffness=1.0, skelOut="skeleton.out",
+                    weightOut="weights.out"):
     # Change current directory to ensure we know where attachment.out will be
     if not os.path.isfile(_PINOCCHIO_BIN):
         raise BinaryNotFoundError("Could not find the binary: %s" %
                                   _PINOCCHIO_BIN)
     os.chdir(_PINOCCHIO_DIR)
     exeAndArgs = [_PINOCCHIO_BIN, meshFile, '-skel', weightFile,
-                  '-stiffness', str(stiffness)]
+                  '-stiffness', str(stiffness),
+                  '-skelOut', skelOut,
+                  '-weightOut', weightOut]
     if fit:
         exeAndArgs.append('-fit')
     if DEBUG:
@@ -438,12 +442,28 @@ def heatWeight(*args, **kwargs):
         are 'closer' to the problem area, or simply correct it with weight
         painting afterward.  (This script is not meant to replace weight
         painting, but merely to give you a better place to start from!)
+    tempOutputDir=None
+        Specify a directory where temporary files used by the Pinocchio binary
+        are stored
+    tempDelete=True
+        Whether or not to delete the temporary files used by the Pinocchio binary
+        when finished
+    tempOverwrite=True
+        Whether or not to overwrite any existing temporary files
     """
     if not args:
         args = listForNone(cmds.ls(sl=1))
     
     fit = kwargs.pop('fit', False)
     stiffness = kwargs.pop('stiffness', 1.0)
+    tempOutputDir = kwargs.pop('tempOutputDir', None)
+    tempDelete = kwargs.pop('tempDelete', True)
+    tempOverwrite = kwargs.pop('tempOverwrite', True)
+    
+    if tempOutputDir:
+        outputDir = tempOutputDir
+    else:
+        outputDir = tempfile.mkdtemp()
     
     inputArgsMessage = "Select one root joint and meshes you wish to weight"
     meshes = []
@@ -482,7 +502,7 @@ def heatWeight(*args, **kwargs):
     else:
         undoable = useUndoableMethod()
     
-    for mesh in meshes:
+    for meshNum, mesh in enumerate(meshes):
         try:
             skinClusters = getSkinClusters(mesh)
             if skinClusters:
@@ -491,41 +511,47 @@ def heatWeight(*args, **kwargs):
                 skin = cmds.skinCluster(mesh, rootJoint, rui=False)[0]
             
             tempArgs={}
-            if KEEP_PINOC_INPUT_FILES:
-                objFilePath = os.path.join(_PINOCCHIO_DIR, 'mayaToPinocModel.obj')
-            else:
-                objFileHandle, objFilePath = tempfile.mkstemp('.obj', **tempArgs)
-                os.close(objFileHandle)
+            
+            def makeFilename(prefix, suffix):
+                # We include the meshNum in the name to ensure that each filename is unique;
+                # we cannot simply use mesh.name(), which would return a unique name, as it might
+                # include characters - such as '|' - that windows won't allow as a filename
+                newName = os.path.join(outputDir, '%s%d_%s%s' % (prefix, meshNum, leafName(mesh), suffix))
+                if (not tempOverwrite) and os.path.exists(newName):
+                    raise CannotOverwriteError("file %r already exists" % newName)
+                return newName
+                
+            
+            objFilePath = makeFilename('model', '.obj')
+            skelFilePath = makeFilename('skel', '.skel')
+            outSkelPath = makeFilename('outSkel', '.skel')
+            outWeightPath = makeFilename('weight', '.weight')
+            
+            tempFiles = (objFilePath, skelFilePath, outSkelPath, outWeightPath)
             try:
-                if KEEP_PINOC_INPUT_FILES:
-                    skelFilePath = os.path.join(_PINOCCHIO_DIR, 'mayaToPinocSkel.skel')
-                else:
-                    skelFileHandle, skelFilePath = tempfile.mkstemp('.skel',**tempArgs)
-                    os.close(skelFileHandle)
-                try:
                     skelFilePath, skelList = \
                         pinocchioSkeletonExport(rootJoint, skelFilePath)
                     objFilePath = pinocchioObjExport(mesh, objFilePath)
                     
-                    runPinocchioBin(objFilePath, skelFilePath, fit=fit,
-                                    stiffness=stiffness)
+                    runPinocchioBin(objFilePath, skelFilePath,
+                                    fit=fit, stiffness=stiffness,
+                                    skelOut=outSkelPath, weightOut=outWeightPath)
                     pinocchioWeightsImport(mesh, skin, skelList,
-                                           weightFile=os.path.join(_PINOCCHIO_DIR,
-                                                                   "attachment.out"))
-                finally:
-                    if not KEEP_PINOC_INPUT_FILES and os.path.isfile(skelFilePath):
-                        os.remove(skelFilePath)
+                                           weightFile=outWeightPath)
             finally:
-                if not KEEP_PINOC_INPUT_FILES and os.path.isfile(objFilePath):
-                    os.remove(objFilePath)
+                if tempDelete:
+                    for tempFile in tempFiles:
+                        if os.path.isfile(tempFile):
+                            os.remove(tempFile)
         except Exception, e:
-            print("warning - encountered exception while weighting mesh %s:" %
-                  mesh)
             if DEBUG:
-                import traceback
-                traceback.print_exc()
+                exceptionInfo = traceback.format_exc()
             else:
-                print e
+                exceptionInfo = str(e)
+            api.MGlobal.displayWarning(
+                    "encountered exception while weighting mesh %s:\n%s" % (mesh, exceptionInfo))
+    if tempDelete and not os.listdir(outputDir):
+        os.rmdir(outputDir)
     return True
 
 # This doesn't work - apparently demoui can't take animation data for arbitrary
@@ -761,3 +787,10 @@ def browseForFile(actionName="Select", fileCommand=None, fileType=None,
         exportFileName = cmds.fileDialog(title=actionName)
         fileCommand(exportFileName, fileType)
     return exportFileName   
+
+def leafName(node):
+    '''Given a string representing a dag node, returns the name of that node
+    wihout any DAG path elements above it.
+
+    Note that shortNameOf is NOT guaranteed to give this...'''
+    return node.split("|")[-1]
