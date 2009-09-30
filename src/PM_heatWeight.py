@@ -165,7 +165,7 @@ DEBUG = False
 _PINOCCHIO_DIR = os.path.join(os.path.dirname(__file__))
 _PINOCCHIO_BIN = os.path.join(_PINOCCHIO_DIR, 'AttachWeights')
 if os.name == 'nt':
-    _PINOCCHIO_BIN += '.exe'
+    _PINOCCHIO_BIN += 'Win.exe'
 elif platform.system() == 'Linux':
     _PINOCCHIO_BIN += 'Linux'
 elif platform.system() == 'Darwin':
