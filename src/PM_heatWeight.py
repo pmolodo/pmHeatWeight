@@ -172,7 +172,7 @@ import maya.mel as mel
 import maya.OpenMaya as api
 import maya.OpenMayaAnim as apiAnim
 
-DEBUG = False
+DEBUG = True
 
 _PINOCCHIO_DIR = os.path.join(os.path.dirname(__file__))
 _PINOCCHIO_BIN = os.path.join(_PINOCCHIO_DIR, 'AttachWeights')
@@ -187,8 +187,11 @@ else:
 
 class PinocchioError(Exception): pass
 class BinaryNotFoundError(PinocchioError): pass
+class InfluenceNotFoundError(PinocchioError): pass
 class CannotOverwriteError(PinocchioError): pass
 
+# In HELP file, there's a Hip|L_Hip and a Hip|transform1|L_Hip ...
+# should we pick up the joint that has a transform inserted?
 def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
     """
     Exports the skeleton to a file format that pinocchio can understand.
@@ -314,21 +317,26 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
             else:
                 print "..."
                 break
-            
-    # Zero all weights
-    cmds.skinPercent(skin, mesh, pruneWeights=100, normalize=False)
-
+    
     if not undoable:
-        # Use the api methods to set skin weights - MUCH faster than using
-        # mel skinPercent, but api doesn't have built-in undo support, so
-        # flush the undo queue
+        # If we're using the non-undoable api method, there's a lot of setup
+        # we have to do first; want to do this before zeroing weights,
+        # in case there's an error 
         apiWeights = api.MDoubleArray(numWeights, 0)
         for vertIndex, jointWeights in enumerate(vertJointWeights):
             for jointIndex, jointValue in enumerate(jointWeights):
                 apiWeights.set(jointValue, vertIndex * numJoints + jointIndex)
         apiJointIndices = api.MIntArray(numJoints, 0)
-        for apiIndex, joint in enumerate(influenceObjects(skin)):
-            apiJointIndices.set(apiIndex, getNodeIndex(joint, pinocInfluences))
+        if DEBUG:
+            for jointIndex, (joint, parentIndex) in enumerate(skelList):
+                print jointIndex, (joint, parentIndex)
+        influences = influenceObjects(skin)
+        for apiIndex, joint in enumerate(influences):
+            influenceIndex = getNodeIndex(joint, pinocInfluences)
+            if influenceIndex is None:
+                raise InfluenceNotFoundError("%r not found in influences for skin %r: %r" %
+                                             (joint, skin, pinocInfluences))
+            apiJointIndices.set(apiIndex, influenceIndex)
         if DEBUG:
             print "apiJointIndices:",
             pyJointIndices = []
@@ -341,16 +349,44 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
             apiVertices.set(i, i)
         api.MFnSingleIndexedComponent(apiComponents).addElements(apiVertices) 
         mfnSkin = apiAnim.MFnSkinCluster(toMObject(skin))
-        oldWeights = api.MDoubleArray()
+        meshDag = toMDagPath(mesh)
+        # Save the weights, so that if there's an error later, we
+        # can still restore the weights
+        savedWeights = api.MDoubleArray()
+        numInfluencesPtr = api.MScriptUtil(0) 
+        mfnSkin.getWeights(meshDag, apiComponents, savedWeights,
+                           numInfluencesPtr.asUintPtr())
+        
+    # Zero all weights (so if there's influences not among those we're
+    # importing, they will have zero influence)
+    cmds.skinPercent(skin, mesh, pruneWeights=100, normalize=False)
+
+    if not undoable:
+        # Use the api methods to set skin weights - MUCH faster than using
+        # mel skinPercent, but api doesn't have built-in undo support, so
+        # flush the undo queue
+        zeroedWeights = api.MDoubleArray()
         undoState = cmds.undoInfo(q=1, state=1)
         cmds.undoInfo(state=False)
         try:
-            mfnSkin.setWeights(toMDagPath(mesh),
-                               apiComponents,
-                               apiJointIndices,
-                               apiWeights,
-                               False,
-                               oldWeights)
+            try:
+                mfnSkin.setWeights(meshDag,
+                                   apiComponents,
+                                   apiJointIndices,
+                                   apiWeights,
+                                   False,
+                                   zeroedWeights)
+            except Exception:
+                # There was a problem, restore the saved weights!
+                influenceIndices = api.MIntArray(len(influences), 0)
+                for i in xrange(len(influences)):
+                    influenceIndices.set(i,i)
+                mfnSkin.setWeights(meshDag,
+                                   apiComponents,
+                                   influenceIndices,
+                                   savedWeights,
+                                   False,
+                                   zeroedWeights)
         finally:
             cmds.flushUndo()
             cmds.undoInfo(state=undoState)
@@ -358,27 +394,28 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
         # Use mel skinPercent - much slower, but undoable
         cmds.progressWindow(title="Setting new weights...", isInterruptable=True,
                             max=numVertices)
-        lastUpdateTime = cmds.timerX()
-        updateInterval = .5
-        for vertIndex, vertJoints in enumerate(vertJointWeights):
-            jointValues = {}
-            if cmds.progressWindow( query=True, isCancelled=True ) :
-                break
-            #print "weighting vert:", vertIndex
-            for jointIndex, jointValue in enumerate(vertJoints):
-                if jointValue > 0:
-                    jointValues[pinocInfluences[jointIndex]] = jointValue
+        try:
+            lastUpdateTime = cmds.timerX()
+            updateInterval = .5
+            for vertIndex, vertJoints in enumerate(vertJointWeights):
+                jointValues = {}
+                if cmds.progressWindow( query=True, isCancelled=True ) :
+                    break
+                #print "weighting vert:", vertIndex
+                for jointIndex, jointValue in enumerate(vertJoints):
+                    if jointValue > 0:
+                        jointValues[pinocInfluences[jointIndex]] = jointValue
+        
+                if cmds.timerX(startTime=lastUpdateTime) > updateInterval:
+                    cmds.progressWindow(edit=True,
+                                        progress=vertIndex,
+                                        status="Setting Vert: (%i of %i)" % (vertIndex, numVertices))
+                    lastUpdateTime = cmds.timerX()
     
-            if cmds.timerX(startTime=lastUpdateTime) > updateInterval:
-                progress = vertIndex
-                cmds.progressWindow(edit=True,
-                                    progress=progress,
-                                    status="Setting Vert: (%i of %i)" % (progress, numVertices))
-                lastUpdateTime = cmds.timerX()
-
-            cmds.skinPercent(skin, mesh + ".vtx[%d]" % vertIndex, normalize=False,
-                             transformValue=jointValues.items())
-        cmds.progressWindow(endProgress=True)    
+                cmds.skinPercent(skin, mesh + ".vtx[%d]" % vertIndex, normalize=False,
+                                 transformValue=jointValues.items())
+        finally:
+            cmds.progressWindow(endProgress=True)    
 
 def useUndoableMethod():
     message = \
@@ -549,7 +586,7 @@ def heatWeight(*args, **kwargs):
                                     fit=fit, stiffness=stiffness,
                                     skelOut=outSkelPath, weightOut=outWeightPath)
                     pinocchioWeightsImport(mesh, skin, skelList,
-                                           weightFile=outWeightPath)
+                                           weightFile=outWeightPath, undoable=undoable)
             finally:
                 if tempDelete:
                     for tempFile in tempFiles:
