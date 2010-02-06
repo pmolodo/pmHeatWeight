@@ -7,3 +7,5 @@ skeleton.out
 attachment.out
 additionalFiles/
 additionalFiles/*
+.project
+.pydevproject
