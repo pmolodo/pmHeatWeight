@@ -192,7 +192,8 @@ class CannotOverwriteError(PinocchioError): pass
 
 # In HELP file, there's a Hip|L_Hip and a Hip|transform1|L_Hip ...
 # should we pick up the joint that has a transform inserted?
-def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
+def pinocchioSkeletonExport(skeletonRoot, skelFile=None,
+                            directDescendentsOnly=False):
     """
     Exports the skeleton to a file format that pinocchio can understand.
 
@@ -201,7 +202,8 @@ def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
     """
     if skelFile is None:
         skelFile = browseForFile(m=1, actionName='Export')
-    skelList = makePinocchioSkeletonList(skeletonRoot)
+    skelList = makePinocchioSkeletonList(skeletonRoot,
+                                directDescendentsOnly=directDescendentsOnly)
     fileObj = open(skelFile, mode="w")
     try:
         for jointIndex, (joint, parentIndex) in enumerate(skelList):
@@ -241,16 +243,43 @@ def pinocchioObjExport(mesh, objFilePath):
     return objFilePath
 
 
-def makePinocchioSkeletonList(rootJoint):
+def makePinocchioSkeletonList(rootJoint,
+                              directDescendentsOnly=False):
     """
     Given a joint, returns info used for the pinocchio skeleton export.
     
     Each item in the list is a tuple ([x,y,z], parentIndex), where
     parentIndex is an index into the list.
     """
-    return _makePinocchioSkeletonList([], rootJoint, -1)
+    if not isATypeOf(rootJoint, 'joint'):
+        raise TypeError("rootJoint arg %r was not a joint" % rootJoint)
+    if directDescendentsOnly:
+        return _makePinocchioSkeletonList_direct([], rootJoint, -1)
+    else:
+        jointChildren = listForNone(cmds.listRelatives(rootJoint, type="joint",
+                                                       allDescendents=True,
+                                                       noIntermediate=True,
+                                                       fullPath=True))
+        allJoints = [rootJoint] + jointChildren
+        skelList = [None] * len(allJoints) # placeholders for now
+        skelList[0] = (rootJoint, -1)
+ 
+        for jointIndex, joint in enumerate(jointChildren):
+            parentJoint = _parentJoint(joint)
+            parentIndex = getNodeIndex(parentJoint, allJoints)
+            if parentIndex is None:
+                raise RuntimeError("could not find joint %r's parent in list of descendent joints" % joint)
+            skelList[jointIndex] = (joint, parentIndex)
+            
+def _parentJoint(childJoint):
+    parent = cmds.listRelatives(childJoint, parent=1,  fullPath=1)
+    while not isATypeOf(parent, 'joint'):
+        if parent is None:
+            break
+        parent = cmds.listRelatives(parent, parent=1,  fullPath=1)
+    return parent
 
-def _makePinocchioSkeletonList(skelList, newJoint, newJointParent):
+def _makePinocchioSkeletonList_direct(skelList, newJoint, newJointParent):
     newIndex = len(skelList)
     skelList.append((newJoint, newJointParent))
 
@@ -502,6 +531,13 @@ def heatWeight(*args, **kwargs):
         when finished
     tempOverwrite=True
         Whether or not to overwrite any existing temporary files
+    directDescendentsOnly=False
+        heatWeight only weights joints; this controls whether there must be a
+        direct joint chain from the root to joints included in the skeleton, or
+        whether there can be intervening (non-joint) transforms.
+        ie, if this setting is False, a joint such as
+            myRoot|myTransform|otherJoint
+        would NOT be allowed; if it is True, it would be.
     """
     if not args:
         args = listForNone(cmds.ls(sl=1))
@@ -511,6 +547,7 @@ def heatWeight(*args, **kwargs):
     tempOutputDir = kwargs.pop('tempOutputDir', None)
     tempDelete = kwargs.pop('tempDelete', True)
     tempOverwrite = kwargs.pop('tempOverwrite', True)
+    directDescendentsOnly = kwargs.pop('directDescendentsOnly', False)
     
     if tempOutputDir:
         outputDir = tempOutputDir
@@ -582,7 +619,8 @@ def heatWeight(*args, **kwargs):
             tempFiles = (objFilePath, skelFilePath, outSkelPath, outWeightPath)
             try:
                     skelFilePath, skelList = \
-                        pinocchioSkeletonExport(rootJoint, skelFilePath)
+                        pinocchioSkeletonExport(rootJoint, skelFilePath,
+                                                directDescendentsOnly=directDescendentsOnly)
                     objFilePath = pinocchioObjExport(mesh, objFilePath)
                     
                     runPinocchioBin(objFilePath, skelFilePath,
