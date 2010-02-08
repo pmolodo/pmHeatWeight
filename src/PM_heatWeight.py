@@ -353,7 +353,8 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
         # Save the weights, so that if there's an error later, we
         # can still restore the weights
         savedWeights = api.MDoubleArray()
-        numInfluencesPtr = api.MScriptUtil(0) 
+        numInfluencesPtr = api.MScriptUtil()
+        numInfluencesPtr.createFromInt(0) 
         mfnSkin.getWeights(meshDag, apiComponents, savedWeights,
                            numInfluencesPtr.asUintPtr())
         
@@ -387,6 +388,8 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
                                    savedWeights,
                                    False,
                                    zeroedWeights)
+                api.MGlobal.displayError("Encountered error setting new weights - original weights restored")
+                raise
         finally:
             cmds.flushUndo()
             cmds.undoInfo(state=undoState)
