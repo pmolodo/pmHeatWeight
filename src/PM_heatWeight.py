@@ -244,7 +244,7 @@ def pinocchioObjExport(mesh, objFilePath):
 
 
 def makePinocchioSkeletonList(rootJoint,
-                              directDescendentsOnly=False):
+                              directDescendentsOnly=True):
     """
     Given a joint, returns info used for the pinocchio skeleton export.
     
@@ -264,15 +264,18 @@ def makePinocchioSkeletonList(rootJoint,
         skelList = [None] * len(allJoints) # placeholders for now
         skelList[0] = (rootJoint, -1)
  
-        for jointIndex, joint in enumerate(jointChildren):
+        # Start at one because we already have rootJoint
+        for jointIndex in xrange(1, len(allJoints)):
+            joint = allJoints[jointIndex]
             parentJoint = _parentJoint(joint)
             parentIndex = getNodeIndex(parentJoint, allJoints)
             if parentIndex is None:
                 raise RuntimeError("could not find joint %r's parent in list of descendent joints" % joint)
             skelList[jointIndex] = (joint, parentIndex)
+        return skelList
             
 def _parentJoint(childJoint):
-    parent = cmds.listRelatives(childJoint, parent=1,  fullPath=1)
+    parent = cmds.listRelatives(childJoint, parent=1,  fullPath=1)[0]
     while not isATypeOf(parent, 'joint'):
         if parent is None:
             break
@@ -406,6 +409,7 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
                                    apiWeights,
                                    False,
                                    zeroedWeights)
+                print "successfully set weights!"
             except Exception:
                 # There was a problem, restore the saved weights!
                 influenceIndices = api.MIntArray(len(influences), 0)
