@@ -244,7 +244,7 @@ def pinocchioObjExport(mesh, objFilePath):
 
 
 def makePinocchioSkeletonList(rootJoint,
-                              directDescendentsOnly=True):
+                              directDescendentsOnly=False):
     """
     Given a joint, returns info used for the pinocchio skeleton export.
     
@@ -291,7 +291,7 @@ def _makePinocchioSkeletonList_direct(skelList, newJoint, newJointParent):
                                                    noIntermediate=True,
                                                    fullPath=True))
     for joint in jointChildren:
-        _makePinocchioSkeletonList(skelList, joint, newIndex)
+        _makePinocchioSkeletonList_direct(skelList, joint, newIndex)
     return skelList
 
 def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
@@ -384,7 +384,7 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
         meshDag = toMDagPath(mesh)
         # Save the weights, so that if there's an error later, we
         # can still restore the weights
-        savedWeights = api.MDoubleArray()
+        savedWeights = api.MDoubleArray(numWeights, 0)
         numInfluencesPtr = api.MScriptUtil()
         numInfluencesPtr.createFromInt(0) 
         mfnSkin.getWeights(meshDag, apiComponents, savedWeights,
