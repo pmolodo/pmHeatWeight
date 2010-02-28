@@ -271,7 +271,7 @@ def _makePinocchioSkeletonList(skelList, newJoint, parentIndex,
         kwargs['type'] = 'joint'
     directChildren = listForNone(cmds.listRelatives(newJoint, **kwargs))
     for child in directChildren:
-        _makePinocchioSkeletonList_direct(skelList, child, nextParentIndex)
+        _makePinocchioSkeletonList(skelList, child, nextParentIndex)
     return skelList
 
 def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
