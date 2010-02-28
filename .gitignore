@@ -1,10 +1,9 @@
 ._*
 *.pyc
 *~
-mayaToPinocModel.obj
-mayaToPinocSkel.skel
-skeleton.out
-attachment.out
+*.obj
+*.skel
+*.out
 additionalFiles/
 additionalFiles/*
 .project
