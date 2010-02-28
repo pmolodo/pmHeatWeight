@@ -129,6 +129,11 @@ correct formatting of that email address...)
 
 Changelog:
 
+v0.6.6 - Bugfix for undoable mode not working (thanks eduardo grana!)
+    Fixed vanishing mesh issue in fast mode
+        (on an error, will now restore original weights)
+    Fixed issue with weighting skeletons with non-joint transforms between
+        joints
 v0.6.5 - New parameters:
     tempOutputDir=None
         Specify a directory where temporary files used by the Pinocchio binary
@@ -157,7 +162,7 @@ class Version(object):
     def __str__(self):
         return ".".join([str(x) for x in self.nums])
 
-version = Version(0,6,5)
+version = Version(0,6,6)
 __doc__ = __doc__ % str(version)
 
 import subprocess
@@ -187,9 +192,13 @@ else:
 
 class PinocchioError(Exception): pass
 class BinaryNotFoundError(PinocchioError): pass
+class InfluenceNotFoundError(PinocchioError): pass
 class CannotOverwriteError(PinocchioError): pass
 
-def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
+# In HELP file, there's a Hip|L_Hip and a Hip|transform1|L_Hip ...
+# should we pick up the joint that has a transform inserted?
+def pinocchioSkeletonExport(skeletonRoot, skelFile=None,
+                            directDescendentsOnly=False):
     """
     Exports the skeleton to a file format that pinocchio can understand.
 
@@ -198,7 +207,8 @@ def pinocchioSkeletonExport(skeletonRoot, skelFile=None):
     """
     if skelFile is None:
         skelFile = browseForFile(m=1, actionName='Export')
-    skelList = makePinocchioSkeletonList(skeletonRoot)
+    skelList = makePinocchioSkeletonList(skeletonRoot,
+                                directDescendentsOnly=directDescendentsOnly)
     fileObj = open(skelFile, mode="w")
     try:
         for jointIndex, (joint, parentIndex) in enumerate(skelList):
@@ -238,25 +248,35 @@ def pinocchioObjExport(mesh, objFilePath):
     return objFilePath
 
 
-def makePinocchioSkeletonList(rootJoint):
+def makePinocchioSkeletonList(rootJoint,
+                              directDescendentsOnly=False):
     """
     Given a joint, returns info used for the pinocchio skeleton export.
     
     Each item in the list is a tuple ([x,y,z], parentIndex), where
     parentIndex is an index into the list.
     """
-    return _makePinocchioSkeletonList([], rootJoint, -1)
+    # Note - it seems that, in current incarnation (2010/02/28),
+    # attachweights requires the skelList's order be such that
+    # parents must be declared before children...
+    if not isATypeOf(rootJoint, 'joint'):
+        raise TypeError("rootJoint arg %r was not a joint" % rootJoint)
+    return _makePinocchioSkeletonList([], rootJoint, -1,
+                                                 directDescendentsOnly=directDescendentsOnly)
 
-def _makePinocchioSkeletonList(skelList, newJoint, newJointParent):
-    newIndex = len(skelList)
-    skelList.append((newJoint, newJointParent))
-
-    jointChildren = listForNone(cmds.listRelatives(newJoint, type="joint",
-                                                   children=True,
-                                                   noIntermediate=True,
-                                                   fullPath=True))
-    for joint in jointChildren:
-        _makePinocchioSkeletonList(skelList, joint, newIndex)
+def _makePinocchioSkeletonList(skelList, newJoint, parentIndex,
+                                        directDescendentsOnly=False):
+    if isATypeOf(newJoint, 'joint'):
+        nextParentIndex = len(skelList)
+        skelList.append((newJoint, parentIndex))
+    else:
+        nextParentIndex = parentIndex
+    kwargs = {'children':True, 'noIntermediate':True, 'fullPath':True}
+    if directDescendentsOnly:
+        kwargs['type'] = 'joint'
+    directChildren = listForNone(cmds.listRelatives(newJoint, **kwargs))
+    for child in directChildren:
+        _makePinocchioSkeletonList(skelList, child, nextParentIndex)
     return skelList
 
 def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
@@ -314,21 +334,26 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
             else:
                 print "..."
                 break
-            
-    # Zero all weights
-    cmds.skinPercent(skin, mesh, pruneWeights=100, normalize=False)
-
+    
     if not undoable:
-        # Use the api methods to set skin weights - MUCH faster than using
-        # mel skinPercent, but api doesn't have built-in undo support, so
-        # flush the undo queue
+        # If we're using the non-undoable api method, there's a lot of setup
+        # we have to do first; want to do this before zeroing weights,
+        # in case there's an error 
         apiWeights = api.MDoubleArray(numWeights, 0)
         for vertIndex, jointWeights in enumerate(vertJointWeights):
             for jointIndex, jointValue in enumerate(jointWeights):
                 apiWeights.set(jointValue, vertIndex * numJoints + jointIndex)
         apiJointIndices = api.MIntArray(numJoints, 0)
-        for apiIndex, joint in enumerate(influenceObjects(skin)):
-            apiJointIndices.set(apiIndex, getNodeIndex(joint, pinocInfluences))
+        if DEBUG:
+            for jointIndex, (joint, parentIndex) in enumerate(skelList):
+                print jointIndex, (joint, parentIndex)
+        influences = influenceObjects(skin)
+        for apiIndex, joint in enumerate(influences):
+            influenceIndex = getNodeIndex(joint, pinocInfluences)
+            if influenceIndex is None:
+                raise InfluenceNotFoundError("%r not found in influences for skin %r: %r" %
+                                             (joint, skin, pinocInfluences))
+            apiJointIndices.set(apiIndex, influenceIndex)
         if DEBUG:
             print "apiJointIndices:",
             pyJointIndices = []
@@ -341,16 +366,48 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
             apiVertices.set(i, i)
         api.MFnSingleIndexedComponent(apiComponents).addElements(apiVertices) 
         mfnSkin = apiAnim.MFnSkinCluster(toMObject(skin))
-        oldWeights = api.MDoubleArray()
+        meshDag = toMDagPath(mesh)
+        # Save the weights, so that if there's an error later, we
+        # can still restore the weights
+        savedWeights = api.MDoubleArray(numWeights, 0)
+        numInfluencesPtr = api.MScriptUtil()
+        numInfluencesPtr.createFromInt(0) 
+        mfnSkin.getWeights(meshDag, apiComponents, savedWeights,
+                           numInfluencesPtr.asUintPtr())
+        
+    # Zero all weights (so if there's influences not among those we're
+    # importing, they will have zero influence)
+    cmds.skinPercent(skin, mesh, pruneWeights=100, normalize=False)
+
+    if not undoable:
+        # Use the api methods to set skin weights - MUCH faster than using
+        # mel skinPercent, but api doesn't have built-in undo support, so
+        # flush the undo queue
+        zeroedWeights = api.MDoubleArray()
         undoState = cmds.undoInfo(q=1, state=1)
         cmds.undoInfo(state=False)
         try:
-            mfnSkin.setWeights(toMDagPath(mesh),
-                               apiComponents,
-                               apiJointIndices,
-                               apiWeights,
-                               False,
-                               oldWeights)
+            try:
+                mfnSkin.setWeights(meshDag,
+                                   apiComponents,
+                                   apiJointIndices,
+                                   apiWeights,
+                                   False,
+                                   zeroedWeights)
+                print "successfully set weights!"
+            except Exception:
+                # There was a problem, restore the saved weights!
+                influenceIndices = api.MIntArray(len(influences), 0)
+                for i in xrange(len(influences)):
+                    influenceIndices.set(i,i)
+                mfnSkin.setWeights(meshDag,
+                                   apiComponents,
+                                   influenceIndices,
+                                   savedWeights,
+                                   False,
+                                   zeroedWeights)
+                api.MGlobal.displayError("Encountered error setting new weights - original weights restored")
+                raise
         finally:
             cmds.flushUndo()
             cmds.undoInfo(state=undoState)
@@ -358,27 +415,28 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
         # Use mel skinPercent - much slower, but undoable
         cmds.progressWindow(title="Setting new weights...", isInterruptable=True,
                             max=numVertices)
-        lastUpdateTime = cmds.timerX()
-        updateInterval = .5
-        for vertIndex, vertJoints in enumerate(vertJointWeights):
-            jointValues = {}
-            if cmds.progressWindow( query=True, isCancelled=True ) :
-                break
-            #print "weighting vert:", vertIndex
-            for jointIndex, jointValue in enumerate(vertJoints):
-                if jointValue > 0:
-                    jointValues[pinocInfluences[jointIndex]] = jointValue
+        try:
+            lastUpdateTime = cmds.timerX()
+            updateInterval = .5
+            for vertIndex, vertJoints in enumerate(vertJointWeights):
+                jointValues = {}
+                if cmds.progressWindow( query=True, isCancelled=True ) :
+                    break
+                #print "weighting vert:", vertIndex
+                for jointIndex, jointValue in enumerate(vertJoints):
+                    if jointValue > 0:
+                        jointValues[pinocInfluences[jointIndex]] = jointValue
+        
+                if cmds.timerX(startTime=lastUpdateTime) > updateInterval:
+                    cmds.progressWindow(edit=True,
+                                        progress=vertIndex,
+                                        status="Setting Vert: (%i of %i)" % (vertIndex, numVertices))
+                    lastUpdateTime = cmds.timerX()
     
-            if cmds.timerX(startTime=lastUpdateTime) > updateInterval:
-                progress = vertIndex
-                cmds.progressWindow(edit=True,
-                                    progress=progress,
-                                    status="Setting Vert: (%i of %i)" % (progress, numVertices))
-                lastUpdateTime = cmds.timerX()
-
-            cmds.skinPercent(skin, mesh + ".vtx[%d]" % vertIndex, normalize=False,
-                             transformValue=jointValues.items())
-        cmds.progressWindow(endProgress=True)    
+                cmds.skinPercent(skin, mesh + ".vtx[%d]" % vertIndex, normalize=False,
+                                 transformValue=jointValues.items())
+        finally:
+            cmds.progressWindow(endProgress=True)    
 
 def useUndoableMethod():
     message = \
@@ -462,6 +520,13 @@ def heatWeight(*args, **kwargs):
         when finished
     tempOverwrite=True
         Whether or not to overwrite any existing temporary files
+    directDescendentsOnly=False
+        heatWeight only weights joints; this controls whether there must be a
+        direct joint chain from the root to joints included in the skeleton, or
+        whether there can be intervening (non-joint) transforms.
+        ie, if this setting is False, a joint such as
+            myRoot|myTransform|otherJoint
+        would NOT be allowed; if it is True, it would be.
     """
     if not args:
         args = listForNone(cmds.ls(sl=1))
@@ -471,6 +536,7 @@ def heatWeight(*args, **kwargs):
     tempOutputDir = kwargs.pop('tempOutputDir', None)
     tempDelete = kwargs.pop('tempDelete', True)
     tempOverwrite = kwargs.pop('tempOverwrite', True)
+    directDescendentsOnly = kwargs.pop('directDescendentsOnly', False)
     
     if tempOutputDir:
         outputDir = tempOutputDir
@@ -542,14 +608,15 @@ def heatWeight(*args, **kwargs):
             tempFiles = (objFilePath, skelFilePath, outSkelPath, outWeightPath)
             try:
                     skelFilePath, skelList = \
-                        pinocchioSkeletonExport(rootJoint, skelFilePath)
+                        pinocchioSkeletonExport(rootJoint, skelFilePath,
+                                                directDescendentsOnly=directDescendentsOnly)
                     objFilePath = pinocchioObjExport(mesh, objFilePath)
                     
                     runPinocchioBin(objFilePath, skelFilePath,
                                     fit=fit, stiffness=stiffness,
                                     skelOut=outSkelPath, weightOut=outWeightPath)
                     pinocchioWeightsImport(mesh, skin, skelList,
-                                           weightFile=outWeightPath)
+                                           weightFile=outWeightPath, undoable=undoable)
             finally:
                 if tempDelete:
                     for tempFile in tempFiles:

@@ -92,7 +92,7 @@ the binary!
 RELEASE INFO:
 -------------
 
-version 0.6.5
+version 0.6.6
 
 New releases will be posted to creativecrash.com (formerly highend3d.com): go to
 http://www.creativecrash.com/maya/downloads/scripts-plugins/character/c/pm-heatweight
@@ -104,6 +104,11 @@ correct formatting of that email address...)
 
 Changelog:
 
+v0.6.6 - Bugfix for undoable mode not working (thanks eduardo grana!)
+    Fixed vanishing mesh issue in fast mode
+        (on an error, will now restore original weights)
+    Fixed issue with weighting skeletons with non-joint transforms between
+        joints
 v0.6.5 - New parameters:
     tempOutputDir=None
         Specify a directory where temporary files used by the Pinocchio binary

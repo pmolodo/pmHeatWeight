@@ -129,6 +129,11 @@ correct formatting of that email address...)
 
 Changelog:
 
+v0.6.6 - Bugfix for undoable mode not working (thanks eduardo grana!)
+    Fixed vanishing mesh issue in fast mode
+        (on an error, will now restore original weights)
+    Fixed issue with weighting skeletons with non-joint transforms between
+        joints
 v0.6.5 - New parameters:
     tempOutputDir=None
         Specify a directory where temporary files used by the Pinocchio binary
@@ -157,7 +162,7 @@ class Version(object):
     def __str__(self):
         return ".".join([str(x) for x in self.nums])
 
-version = Version(0,6,5)
+version = Version(0,6,6)
 __doc__ = __doc__ % str(version)
 
 import subprocess
@@ -172,7 +177,7 @@ import maya.mel as mel
 import maya.OpenMaya as api
 import maya.OpenMayaAnim as apiAnim
 
-DEBUG = True
+DEBUG = False
 
 _PINOCCHIO_DIR = os.path.join(os.path.dirname(__file__))
 _PINOCCHIO_BIN = os.path.join(_PINOCCHIO_DIR, 'AttachWeights')
