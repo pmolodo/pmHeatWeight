@@ -27,7 +27,7 @@ import re
 #    return htmlPath
 
 def createReadmeFile(readmePath, body):
-    readmeFile = open(readmePath, "w")
+    readmeFile = open(readmePath, "wb")
     # Convert to windows newlines as other systems usually do a better
     # job of reading windows newlines, while windows does a crappy job of
     # reading other system's newlines...
