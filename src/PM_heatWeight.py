@@ -265,7 +265,7 @@ def _makePinocchioSkeletonList(skelList, newJoint, parentIndex,
         nextParentIndex = len(skelList)
         skelList.append((newJoint, parentIndex))
     else:
-        nextParentIndex = newJointParent
+        nextParentIndex = parentIndex
     kwargs = {'children':True, 'noIntermediate':True, 'fullPath':True}
     if directDescendentsOnly:
         kwargs['type'] = 'joint'
