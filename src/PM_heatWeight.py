@@ -251,47 +251,27 @@ def makePinocchioSkeletonList(rootJoint,
     Each item in the list is a tuple ([x,y,z], parentIndex), where
     parentIndex is an index into the list.
     """
+    # Note - it seems that, in current incarnation (2010/02/28),
+    # attachweights requires the skelList's order be such that
+    # parents must be declared before children...
     if not isATypeOf(rootJoint, 'joint'):
         raise TypeError("rootJoint arg %r was not a joint" % rootJoint)
-    if directDescendentsOnly:
-        return _makePinocchioSkeletonList_direct([], rootJoint, -1)
+    return _makePinocchioSkeletonList([], rootJoint, -1,
+                                                 directDescendentsOnly=directDescendentsOnly)
+
+def _makePinocchioSkeletonList(skelList, newJoint, parentIndex,
+                                        directDescendentsOnly=False):
+    if isATypeOf(newJoint, 'joint'):
+        nextParentIndex = len(skelList)
+        skelList.append((newJoint, parentIndex))
     else:
-        jointChildren = listForNone(cmds.listRelatives(rootJoint, type="joint",
-                                                       allDescendents=True,
-                                                       noIntermediate=True,
-                                                       fullPath=True))
-        allJoints = [rootJoint] + jointChildren
-        skelList = [None] * len(allJoints) # placeholders for now
-        skelList[0] = (rootJoint, -1)
- 
-        # Start at one because we already have rootJoint
-        for jointIndex in xrange(1, len(allJoints)):
-            joint = allJoints[jointIndex]
-            parentJoint = _parentJoint(joint)
-            parentIndex = getNodeIndex(parentJoint, allJoints)
-            if parentIndex is None:
-                raise RuntimeError("could not find joint %r's parent in list of descendent joints" % joint)
-            skelList[jointIndex] = (joint, parentIndex)
-        return skelList
-            
-def _parentJoint(childJoint):
-    parent = cmds.listRelatives(childJoint, parent=1,  fullPath=1)[0]
-    while not isATypeOf(parent, 'joint'):
-        if parent is None:
-            break
-        parent = cmds.listRelatives(parent, parent=1,  fullPath=1)
-    return parent
-
-def _makePinocchioSkeletonList_direct(skelList, newJoint, newJointParent):
-    newIndex = len(skelList)
-    skelList.append((newJoint, newJointParent))
-
-    jointChildren = listForNone(cmds.listRelatives(newJoint, type="joint",
-                                                   children=True,
-                                                   noIntermediate=True,
-                                                   fullPath=True))
-    for joint in jointChildren:
-        _makePinocchioSkeletonList_direct(skelList, joint, newIndex)
+        nextParentIndex = newJointParent
+    kwargs = {'children':True, 'noIntermediate':True, 'fullPath':True}
+    if directDescendentsOnly:
+        kwargs['type'] = 'joint'
+    directChildren = listForNone(cmds.listRelatives(newJoint, **kwargs))
+    for child in directChildren:
+        _makePinocchioSkeletonList_direct(skelList, child, nextParentIndex)
     return skelList
 
 def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
