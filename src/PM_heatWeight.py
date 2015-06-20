@@ -347,8 +347,8 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
     if DEBUG:
         print "numVertices:", numVertices
         print "numBones:", numBones
-    assert(numBones == numJoints - 1,
-           "numBones (%d) != numJoints (%d) - 1" % (numBones, numJoints))
+    assert numBones == numJoints - 1, \
+           "numBones (%d) != numJoints (%d) - 1" % (numBones, numJoints)
 
     # Pinocchio sets weights per-bone... maya weights per joint.
     # Need to decide whether to assign the bone weight to the 'start' joint
@@ -366,9 +366,9 @@ def pinocchioWeightsImport(mesh, skin, skelList, weightFile=None,
             boneIndexToJointIndex[jointIndex - 1] = parentIndex
     
     for vertIndex, boneWeights in enumerate(vertBoneWeights):
-        assert(abs(sum(boneWeights) - 1) < 0.1,
-               "Output for vert %d not normalized - total was: %.03f" %
-               (vertIndex, sum(boneWeights)))
+        assert abs(sum(boneWeights) - 1) < 0.1, \
+               "Output for vert %d not normalized - total was: %.03f" % \
+               (vertIndex, sum(boneWeights))
         for boneIndex, boneValue in enumerate(boneWeights):
             # multiple bones can correspond to a single joint -
             # make sure to add the various bones values together!
