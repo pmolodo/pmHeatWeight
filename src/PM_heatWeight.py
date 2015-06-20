@@ -824,8 +824,7 @@ def addShape( origShape, **kwargs ):
     #    transform (result: originalTransform|duplicatedShape)
     newShape = cmds.parent(getShape(dupeTransform2),
                            getParent(origShape),
-                           shape=True, addObject=True,
-                           relative=True)[0]
+                           shape=True, relative=True)[0]
 
     # 6) delete the extra transform (delete dupeTransform2)
     cmds.delete(dupeTransform2)
