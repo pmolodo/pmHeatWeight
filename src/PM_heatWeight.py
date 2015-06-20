@@ -224,6 +224,55 @@ def pinocchioSkeletonExport(skeletonRoot, skelFile=None,
         fileObj.close()
     return (skelFile, skelList)
 
+def pinocchioSkeletonImport(skelFile):
+    name = os.path.splitext(os.path.basename(skelFile))[0]
+    rootNode = cmds.createNode('transform', name=name)
+
+    lines = []
+    joints = {}
+    with open(skelFile) as f:
+        for line in f:
+            # sample line:
+            # 0 -0.0531414 0.730573 -0.0125116 -1
+            if not line:
+                continue
+            lines.append(x for x in line.split() if x)
+
+    # get a bounding box, to estimate joint size
+    mins = [None, None, None]
+    maxes = [None, None, None]
+    for line in lines:
+        jointIndex, x, y, z, parentIndex = line
+        jointIndex, parentIndex = [int(i) for i in (jointIndex, parentIndex)]
+        pt = [float(f) for f in (x, y , z)]
+        for i in xrange(3):
+            val = pt[i]
+            oldMin = mins[i]
+            oldMax = maxes[i]
+
+            if oldMin is None or val < oldMin:
+                mins[i] = val
+            if oldMax is None or val > oldMax:
+                maxes[i] = val
+
+        if parentIndex == -1:
+            parent = rootNode
+        else:
+            parent = joints[parentIndex]
+        newJoint = cmds.createNode('joint', name='joint%02d' % jointIndex,
+            parent=parent)
+        cmds.xform(newJoint, translation=pt, worldSpace=True)
+        joints[jointIndex] = newJoint
+
+    # get the maximum of deltaX / deltaY / deltaZ
+    size = max(maxes[i] - mins[i] for i in xrange(3))
+    jtRadius = size / 50.0
+    for jt in joints.itervalues():
+        cmds.setAttr('%s.radius' % jt, jtRadius)
+    cmds.select(rootNode)
+
+    return rootNode
+
 def pinocchioObjExport(mesh, objFilePath):
     loadObjPlugin()
     savedSel = cmds.ls(sl=1)
